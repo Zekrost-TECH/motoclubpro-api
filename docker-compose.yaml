@@ -1,0 +1,109 @@
+version: '3.9'
+
+services:
+
+  # ── PostgreSQL + PostGIS ───────────────────────────────────────────────────
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: motoclubpro_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       motoclubpro
+      POSTGRES_USER:     motoclubpro
+      POSTGRES_PASSWORD: dev_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Script de inicialización: habilita extensiones al crear la DB
+      - ./src/infra/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./src/infra/seed.sql:/docker-entrypoint-initdb.d/seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U motoclubpro -d motoclubpro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: motoclubpro_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --bind 0.0.0.0
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── API NestJS ─────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../motoclubpro-api
+      dockerfile: Dockerfile.dev
+      target: builder        # en dev usamos el stage builder para hot reload
+    container_name: motoclubpro_api
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV:          development
+      PORT:              3000
+      DATABASE_URL:      postgresql://motoclubpro:dev_secret@postgres:5432/motoclubpro
+      REDIS_URL:         redis://redis:6379
+      JWT_SECRET:        dev_jwt_secret_change_in_production
+      JWT_EXPIRES_IN:    15m
+      REFRESH_SECRET:    dev_refresh_secret_change_in_production
+      REFRESH_EXPIRES_IN: 30d
+      ALLOWED_ORIGINS:   "http://localhost,http://localhost:5173,http://localhost:3001,capacitor://localhost,https://localhost,http://10.0.2.2:3000"
+    volumes:
+      # Hot reload: monta el src local sobre el contenedor
+      - ../motoclubpro-api/src:/app/src
+    command: bun run start:dev
+
+  # ── Tracker Go ────────────────────────────────────────────────────────────
+  tracker:
+    build:
+      context: ../motoclubpro-tracker
+      dockerfile: Dockerfile.dev
+      target: builder
+    container_name: motoclubpro_tracker
+    restart: unless-stopped
+    depends_on:
+      redis: { condition: service_healthy }
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_URL:  redis://redis:6379
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      WS_PORT:    8081
+      ENV:        development
+    command: go run ./cmd/tracker/main.go   # ← esto faltaba en dev
+
+  # ── Adminer (UI para ver la DB en dev) ────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: motoclubpro_adminer
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN:         pepa-linha
+
+volumes:
+  pgdata:
+    name: motoclubpro_pgdata

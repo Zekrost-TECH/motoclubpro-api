@@ -1,0 +1,46 @@
+# ── Stage 1: dependencias ────────────────────────────────────────────────────
+FROM oven/bun:1.3.11-alpine AS deps
+
+WORKDIR /app
+
+# Copiar solo los manifests primero para aprovechar cache de Docker
+COPY package.json bun.lock ./
+
+# Instalar dependencias de producción únicamente
+RUN bun install --frozen-lockfile --production
+
+# ── Stage 2: build ───────────────────────────────────────────────────────────
+FROM oven/bun:1.3.11-alpine AS builder
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+
+# Compilar TypeScript a JS
+RUN bun run build
+
+# ── Stage 3: runner (imagen final mínima) ────────────────────────────────────
+FROM oven/bun:1.3.11-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Solo lo necesario para correr
+COPY --from=builder /app/dist        ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
+# Prisma necesita el schema para el cliente generado
+COPY --from=builder /app/prisma ./prisma
+
+# Puerto expuesto (Railway/DO lo sobreescribe con PORT)
+EXPOSE 3000
+
+# Healthcheck para Docker y Railway
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/v1/health || exit 1
+
+CMD ["bun", "dist/main.js"]
