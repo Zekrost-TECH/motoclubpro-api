@@ -1,61 +1,53 @@
 import { IsString, IsOptional, IsArray, IsEnum } from 'class-validator';
-import { UserRole } from "../users.types";
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { UserRole } from '../users.types';
 
 export class UpdateUserDto {
-    @IsOptional() @IsString()
+    @ApiPropertyOptional() @IsOptional() @IsString()
     name?: string;
 
-    @IsOptional() @IsString()
+    @ApiPropertyOptional() @IsOptional() @IsString()
     email?: string;
 
-    @IsOptional() @IsString()
+    @ApiPropertyOptional() @IsOptional() @IsString()
     nickname?: string;
 
-    @IsOptional() @IsString()
+    @ApiPropertyOptional() @IsOptional() @IsString()
     phone?: string;
 
-    @IsOptional() @IsString()
-    avatar_url?: string;
+    @ApiPropertyOptional() @IsOptional() @IsString()
+    avatarUrl?: string;
 
-    @IsOptional() @IsString()
+    @ApiPropertyOptional() @IsOptional() @IsString()
     avatarInitials?: string;
 
-    @IsOptional() @IsEnum(UserRole)
+    @ApiPropertyOptional({ enum: UserRole }) @IsOptional() @IsEnum(UserRole)
     role?: UserRole;
 
-    @IsOptional() @IsString()
+    @ApiPropertyOptional() @IsOptional() @IsString()
     riderLevel?: string;
 
-    @IsOptional() @IsString()
-    rider_level?: string;
-
-    @IsOptional() @IsString()
+    @ApiPropertyOptional() @IsOptional() @IsString()
     passwordHash?: string;
 
-    @IsOptional() @IsString()
-    password_hash?: string;
+    @ApiPropertyOptional() @IsOptional() @IsString()
+    bloodType?: string;
 
-    @IsOptional() @IsString()
-    blood_type?: string;
-
-    @IsOptional() @IsArray()
+    @ApiPropertyOptional() @IsOptional() @IsArray()
     allergies?: string[];
 
-    @IsOptional() @IsArray()
-    medical_conditions?: string[];
+    @ApiPropertyOptional() @IsOptional() @IsArray()
+    medicalConditions?: string[];
 
-    @IsOptional() @IsString()
-    ec_name?: string;
+    @ApiPropertyOptional() @IsOptional() @IsString()
+    ecName?: string;
 
-    @IsOptional() @IsString()
-    ec_phone?: string;
+    @ApiPropertyOptional() @IsOptional() @IsString()
+    ecPhone?: string;
 
-    @IsOptional() @IsString()
-    ec_relationship?: string;
+    @ApiPropertyOptional() @IsOptional() @IsString()
+    ecRelationship?: string;
 
-    @IsOptional() @IsString()
-    fcm_token?: string;
-
-    @IsOptional() @IsString()
+    @ApiPropertyOptional() @IsOptional() @IsString()
     fcmToken?: string;
 }

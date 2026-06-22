@@ -4,9 +4,20 @@ import { Injectable, UnauthorizedException, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 import { UsersService } from '../../users/users.service';
-import { UserRole } from '../../users/users.types';
+import type { Request } from 'express';
+import { UserRole, User } from '../../users/users.types';
 
-export type JwtPayload = { sub: string; email: string; role: UserRole };
+export interface JwtClub {
+    club_id: string;
+    role: UserRole;
+}
+
+export type JwtPayload = {
+    sub: string;
+    email: string;
+    role: UserRole;
+    clubs: JwtClub[];
+};
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -18,12 +29,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            secretOrKey: configService.get<string>('JWT_SECRET') || 'defaultSecretChangeThis',
+            secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
             passReqToCallback: true,
         });
     }
 
-    async validate(req: any, payload: JwtPayload) {
+    async validate(req: Request, payload: JwtPayload) {
         const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
 
         if (token) {
@@ -33,7 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             }
         }
 
-        const user = await this.usersService.findOne(payload.sub);
+        const user = (await this.usersService.findOne(payload.sub)) as User | null;
 
         if (!user) {
             throw new UnauthorizedException('Usuario no existe');
@@ -43,6 +54,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             throw new UnauthorizedException('User account is inactive');
         }
 
-        return user;
+        return { ...user, clubs: payload.clubs ?? [] };
     }
 }

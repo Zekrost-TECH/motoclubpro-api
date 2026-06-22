@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
@@ -13,6 +14,9 @@ import { EventsModule } from './events/events.module';
 import { SosModule } from './sos/sos.module';
 import { SupportModule } from './support/support.module';
 import { RedisModule } from './redis/redis.module';
+import { BillingModule } from './billing/billing.module';
+import { ClubsModule } from './clubs/clubs.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -40,12 +44,18 @@ import { RedisModule } from './redis/redis.module';
     RedisModule,
     SosModule,
     SupportModule,
-    // RuntModule,
+    BillingModule,
+    HealthModule,
+    ClubsModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
     },
   ],
 })

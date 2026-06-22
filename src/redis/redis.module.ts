@@ -1,4 +1,4 @@
-import { Module, Global } from '@nestjs/common';
+import { Module, Global, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 
@@ -10,16 +10,30 @@ import { Redis } from 'ioredis';
             provide: 'REDIS_CLIENT',
             useFactory: (configService: ConfigService) => {
                 const redisUrl = configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
-
                 const isTLS = redisUrl.startsWith('rediss://');
 
-                return new Redis(redisUrl, {
+                const client = new Redis(redisUrl, {
+                    maxRetriesPerRequest: 3,
                     ...(isTLS && {
                         tls: {
                             rejectUnauthorized: false,
                         },
                     }),
                 });
+
+                client.on('error', (err) => {
+                    Logger.error('Redis connection error', err instanceof Error ? err.stack : String(err), 'RedisModule');
+                });
+
+                client.on('reconnecting', () => {
+                    Logger.warn('Redis reconnecting...', 'RedisModule');
+                });
+
+                client.on('connect', () => {
+                    Logger.log('Redis connected', 'RedisModule');
+                });
+
+                return client;
             },
             inject: [ConfigService],
         },

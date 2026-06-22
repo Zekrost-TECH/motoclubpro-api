@@ -4,6 +4,11 @@ export enum UserRole {
     piloto = 'piloto'
 }
 
+export interface UserClub {
+    club_id: string;
+    role: UserRole;
+}
+
 export interface User {
     id: string;
     name: string;
@@ -24,4 +29,5 @@ export interface User {
     totalKm?: number;
     joinDate: Date;
     isActive: boolean;
+    clubs?: UserClub[];
 }

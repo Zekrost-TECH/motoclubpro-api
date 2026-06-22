@@ -1,14 +1,19 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req, ParseFloatPipe, ParseEnumPipe } from '@nestjs/common';
-import { SupportService } from './support.service';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req, ParseFloatPipe } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { SupportService, type SupportPointRow, type SupportPointSummary, type SupportPointVerify, type SupportPointReview } from './support.service';
 import { CreateSupportDto, SupportType } from './dto/create-support.dto';
 import { ReviewSupportDto } from './dto/review-support.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { ClubGuard } from '../auth/guards/club.guard';
+import { ClubRolesGuard } from '../auth/guards/club-roles.guard';
+import { ClubRoles } from '../auth/decorators/club-role.decorator';
+import { CurrentClub } from '../auth/decorators/club.decorator';
 import { UserRole } from '../users/users.types';
+import type { AuthRequest } from '../auth/auth.types';
 
 @Controller('support')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('support')
+@UseGuards(JwtAuthGuard, ClubGuard, ClubRolesGuard)
 export class SupportController {
     constructor(private readonly supportService: SupportService) { }
 
@@ -18,25 +23,26 @@ export class SupportController {
         @Query('lng', ParseFloatPipe) lng: number,
         @Query('radius', ParseFloatPipe) radiusMs: number,
         @Query('type') type?: SupportType,
-    ) {
-        return await this.supportService.search(lat, lng, radiusMs, type);
+        @CurrentClub() clubId?: string,
+    ): Promise<SupportPointRow[]> {
+        return await this.supportService.search(lat, lng, radiusMs, type, clubId);
     }
 
     @Post()
-    async create(@Req() req, @Body() createSupportDto: CreateSupportDto) {
-        const userId = req.user.sub || req.user.id;
-        return await this.supportService.create(userId, createSupportDto);
+    async create(@Req() req: AuthRequest, @Body() createSupportDto: CreateSupportDto, @CurrentClub() clubId?: string): Promise<SupportPointSummary> {
+        const userId = req.user.id;
+        return await this.supportService.create(userId, createSupportDto, clubId);
     }
 
     @Patch(':id/verify')
-    @Roles(UserRole.admin)
-    async verify(@Param('id') id: string) {
-        return await this.supportService.verify(id);
+    @ClubRoles(UserRole.admin, UserRole.lider)
+    async verify(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<SupportPointVerify> {
+        return await this.supportService.verify(id, clubId);
     }
 
     @Post(':id/review')
-    async review(@Req() req, @Param('id') id: string, @Body() reviewDto: ReviewSupportDto) {
-        const userId = req.user.sub || req.user.id;
-        return await this.supportService.review(id, userId, reviewDto);
+    async review(@Req() req: AuthRequest, @Param('id') id: string, @Body() reviewDto: ReviewSupportDto, @CurrentClub() clubId?: string): Promise<SupportPointReview> {
+        const userId = req.user.id;
+        return await this.supportService.review(id, userId, reviewDto, clubId);
     }
 }

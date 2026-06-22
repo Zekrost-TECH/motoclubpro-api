@@ -1,98 +1,147 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# MotoClub Pro API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend API REST para MotoClub Pro, plataforma SaaS multiclub para gestion de clubes de motociclismo en Colombia.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Stack Tecnologico
 
-## Description
+| Tecnologia | Version | Proposito |
+|---|---|---|
+| NestJS | ^11.1.17 | Framework backend (Fastify adapter) |
+| TypeScript | ^6.0.2 | Tipado estatico |
+| PostgreSQL | 15+ | Base de datos principal |
+| PostGIS | 3.4+ | Geospatial queries para rutas y waypoints |
+| Redis | 7+ | Cache, pub/sub SOS, token blacklist |
+| Bun | 1.3+ | Runtime y gestor de paquetes |
+| JWT | - | Auth access + refresh tokens con rotacion |
+| Firebase Admin | ^13.7.0 | Push notifications (FCM) |
+| WomPI | - | Pasarela de pagos Colombia |
+| Alegra | - | Facturacion electronica DIAN |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Arquitectura
 
-## Project setup
+- **Multi-tenancy:** Cada endpoint protegido usa header `x-club-id` + `ClubGuard` / `ClubRolesGuard`.
+- **Rate Limiting:** `@nestjs/throttler` — 60 req/min por IP.
+- **Auth:** JWT access (15min) + refresh (30d). Tokens invalidados se agregan a blacklist en Redis.
+- **SOS Alerts:** Pub/sub Redis entre API y Tracker para broadcast en tiempo real.
+- **Webhooks:** WomPI webhook controller con verificacion de checksum.
 
-```bash
-$ npm install
+## Modulos
+
+| Modulo | Descripcion |
+|---|---|
+| `auth` | Login, registro, refresh, logout, guards, decorators |
+| `users` | CRUD usuarios, info medica, membresias de club |
+| `clubs` | Creacion de clubes, miembros, billing, suscripciones |
+| `events` | Rodadas, RSVP, roles de rodada, checklist, inventario |
+| `motorcycles` | Perfiles de motocicletas, historial de mantenimiento |
+| `routes` | Rutas PostGIS, waypoints, import batch GeoJSON |
+| `sos` | Alertas de emergencia con geolocalizacion y FCM push |
+| `support` | Puntos de apoyo con reviews y verificacion |
+| `billing` | Webhooks WomPI, pagos recurrentes, facturacion DIAN |
+| `notifications` | Multicast FCM para SOS y alertas generales |
+
+## Estructura del Proyecto
+
+```
+src/
+|-- auth/           # Auth module (JWT, guards, decorators)
+|-- billing/        # WomPI webhooks, Alegra invoicing
+|-- clubs/          # Club CRUD, members, billing endpoints
+|-- events/         # Event CRUD, attendees, checklist, inventory
+|-- motorcycles/    # Motorcycle profiles, maintenance
+|-- notifications/  # FCM push service
+|-- routes/         # Route CRUD, waypoints (PostGIS)
+|-- sos/            # SOS alerts, geolocation
+|-- support/        # Support points, reviews
+|-- users/          # User CRUD, medical info
+|-- app.module.ts   # Root module
+|-- main.ts         # Bootstrap (Fastify adapter)
 ```
 
-## Compile and run the project
+## Requisitos
+
+- Bun 1.3+ (o Node.js 20+)
+- PostgreSQL 15+ con extensiones `pgcrypto` y `postgis`
+- Redis 7+
+- Cuenta Firebase (para FCM)
+- Credenciales WomPI (sandbox o produccion)
+- Cuenta Alegra (para facturacion DIAN)
+
+## Instalacion
 
 ```bash
-# development
-$ npm run start
+cd motoclubpro-api
 
-# watch mode
-$ npm run start:dev
+# Dependencias
+bun install
 
-# production mode
-$ npm run start:prod
+# Variables de entorno
+cp .env.example .env
+# Editar .env con tus credenciales
+
+# Base de datos (crear DB y ejecutar migraciones)
+# Ver motoclubpro-api/infra/ para scripts SQL
+
+# Desarrollo con hot-reload
+bun run start:dev
 ```
 
-## Run tests
+La API estara en `http://localhost:3000/api/v1`.
+
+## Scripts
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+bun run start:dev      # Desarrollo con hot-reload
+bun run build          # Compilar TypeScript
+bun run start:prod     # Produccion (dist/main.js)
+bun run lint           # ESLint
+bun run test           # Unit tests (Jest)
+bun run test:e2e       # End-to-end tests
+bun run test:cov       # Coverage report
 ```
 
-## Deployment
+## Variables de Entorno
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Ver `.env.example` para la lista completa. Clave:
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Variable | Descripcion |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `JWT_SECRET` / `REFRESH_SECRET` | Secrets para firmar tokens (min 32 chars) |
+| `ALLOWED_ORIGINS` | Origenes CORS permitidos |
+| `WOMPI_*` | Credenciales WomPI (public, private, webhook secret) |
+| `ALEGRA_*` | Credenciales Alegra (email, API key) |
+| `FIREBASE_*` | Firebase Admin SDK (projectId, privateKey, clientEmail) |
+
+## Docker
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Build de produccion
+docker build -f Dockerfile -t motoclubpro-api:latest .
+
+# Build de desarrollo
+docker build -f Dockerfile.dev -t motoclubpro-api:dev .
+
+# Correr
+docker run -d -p 3000:3000 --env-file .env motoclubpro-api:latest
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Convenciones API
 
-## Resources
+- Prefijo base: `/api/v1`
+- Auth: `Authorization: Bearer <token>`
+- Multi-tenant: `x-club-id: <clubId>`
+- Validacion: `class-validator` DTOs
+- Rate limit: 60 req/min por IP
+- Healthcheck: `GET /api/v1/health`
 
-Check out a few resources that may come in handy when working with NestJS:
+## Documentacion Relacionada
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+- [Guia de Desarrollo Local](../../docs/LOCAL-DEVELOPMENT-GUIDE.md)
+- [Guia de Despliegue a Produccion](../../docs/PRODUCTION-DEPLOYMENT-GUIDE.md)
+- [Documentacion Tecnica Web](../../docs/WEB-TECHNICAL-DOCUMENTATION.md)
 
-## Support
+## Licencia
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED — Software comercial privado.

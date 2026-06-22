@@ -4,14 +4,11 @@ import { DatabaseService } from '../database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserRole } from './users.types';
+import { toSnakeCase } from '../common/utils/string.utils';
 
 @Injectable()
 export class UsersService {
     constructor(private db: DatabaseService) { }
-
-    private toSnakeCase(str: string): string {
-        return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-    }
 
     async createUser(data: CreateUserDto): Promise<User> {
         const { rows: existingUser } = await this.db.query(
@@ -23,9 +20,8 @@ export class UsersService {
             throw new ConflictException('Email already in use');
         }
 
-        const passToHash = data.password || data.passwordHash || data.password_hash;
-        if (!passToHash) throw new ConflictException('Password required');
-        const hashedPassword = await bcrypt.hash(passToHash, 10);
+        if (!data.password) throw new ConflictException('Password required');
+        const hashedPassword = await bcrypt.hash(data.password, 10);
 
         const { rows } = await this.db.query<User>(
             `INSERT INTO users (
@@ -37,7 +33,7 @@ export class UsersService {
                 data.nickname,
                 data.email,
                 data.role || 'piloto',
-                data.riderLevel || data.rider_level || 'novato',
+                data.riderLevel || 'novato',
                 hashedPassword
             ]
         );
@@ -45,16 +41,45 @@ export class UsersService {
         return rows[0];
     }
 
-    async findAll(): Promise<User[]> {
-        const { rows } = await this.db.query<User>(`
-            SELECT id, name, nickname, email, role, rider_level AS "riderLevel", join_date AS "joinDate", is_active AS "isActive"
-            FROM users
-            WHERE is_active = true
-        `);
-        return rows;
+    async findAll(clubId?: string, page = 1, limit = 20): Promise<{ data: User[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+        let query: string;
+        let countQuery: string;
+        let params: (string | null)[] = [];
+
+        if (clubId) {
+            query = `
+                SELECT u.id, u.name, u.nickname, u.email, u.role, u.rider_level AS "riderLevel", u.join_date AS "joinDate", u.is_active AS "isActive"
+                FROM users u
+                JOIN club_members cm ON u.id = cm.user_id
+                WHERE cm.club_id = $1 AND cm.is_active = TRUE AND u.is_active = true
+            `;
+            countQuery = `SELECT COUNT(*)::int as count FROM users u JOIN club_members cm ON u.id = cm.user_id WHERE cm.club_id = $1 AND cm.is_active = TRUE AND u.is_active = true`;
+            params = [clubId];
+        } else {
+            query = `
+                SELECT id, name, nickname, email, role, rider_level AS "riderLevel", join_date AS "joinDate", is_active AS "isActive"
+                FROM users
+                WHERE is_active = true
+            `;
+            countQuery = `SELECT COUNT(*)::int as count FROM users WHERE is_active = true`;
+        }
+
+        const offset = (page - 1) * limit;
+        query += ` ORDER BY name ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+
+        const [{ rows: countRows }, { rows }] = await Promise.all([
+            this.db.query<{ count: number }>(countQuery, params),
+            this.db.query<User>(query, [...params, limit, offset]),
+        ]);
+
+        const total = countRows[0]?.count ?? 0;
+        return {
+            data: rows,
+            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        };
     }
 
-    async findOne(id: string) {
+    async findOne(id: string): Promise<User & { motorcycle?: unknown; userPositions?: unknown }> {
         const { rows: userRows } = await this.db.query<User>(`
             SELECT
                 id, name, nickname, email, phone, avatar_url, avatar_initials,
@@ -69,9 +94,9 @@ export class UsersService {
             throw new NotFoundException(`User with ID ${id} not found`);
         }
 
-        const user: any = userRows[0];
+        const user = userRows[0] as User & { motorcycle?: unknown; userPositions?: unknown };
 
-        const { rows: motorcycles } = await this.db.query(`
+        const { rows: motorcycles } = await this.db.query<Record<string, unknown>>(`
             SELECT
                 id,
                 user_id as userId,
@@ -91,7 +116,7 @@ export class UsersService {
         `, [id]);
         user.motorcycle = motorcycles[0] || null;
 
-        const { rows: positions } = await this.db.query(`
+        const { rows: positions } = await this.db.query<Record<string, unknown>>(`
             SELECT up.*, cp.name as "clubPositionName", cp.icon as "clubPositionIcon"
             FROM user_positions up
             JOIN club_positions cp ON up.position_id = cp.id
@@ -116,10 +141,10 @@ export class UsersService {
     }
 
     async updateUser(id: string, data: UpdateUserDto): Promise<User> {
-        const typedData: any = { ...data };
+        const typedData: Record<string, unknown> = { ...data };
 
         if (typedData.passwordHash) {
-            typedData.passwordHash = await bcrypt.hash(typedData.passwordHash, 10);
+            typedData.passwordHash = await bcrypt.hash(typedData.passwordHash as string, 10);
             typedData.password_hash = typedData.passwordHash;
             delete typedData.passwordHash;
         }
@@ -127,11 +152,9 @@ export class UsersService {
         const keys = Object.keys(typedData).filter(x => typedData[x] !== undefined);
         if (keys.length === 0) return this.findOne(id);
 
-        const setString = keys.map((key, i) => `"${this.toSnakeCase(key)}" = $${i + 1}`).join(', ');
+        const setString = keys.map((key, i) => `"${toSnakeCase(key)}" = $${i + 1}`).join(', ');
         const values = keys.map(k => typedData[k]);
         values.push(id);
-
-        console.log('Updating user with:', { id, data, setString, values }); // Debug log
 
         const query = `
             UPDATE users
@@ -140,15 +163,15 @@ export class UsersService {
             RETURNING id, name, nickname, email, role, rider_level AS "riderLevel", join_date AS "joinDate", is_active AS "isActive"
         `;
 
-        const { rows } = await this.db.query(query, values);
+        const { rows } = await this.db.query<User>(query, values);
         if (rows.length === 0) {
             throw new NotFoundException(`User with ID ${id} not found`);
         }
         return rows[0];
     }
 
-    async getMedicalInfo(id: string) {
-        const { rows } = await this.db.query(`
+    async getMedicalInfo(id: string): Promise<User> {
+        const { rows } = await this.db.query<User>(`
             SELECT blood_type AS "bloodType", allergies, medical_conditions AS "medicalConditions",
                    ec_name AS "ecName", ec_phone AS "ecPhone", ec_relationship AS "ecRelationship"
             FROM users WHERE id = $1
@@ -161,9 +184,9 @@ export class UsersService {
         return rows[0];
     }
 
-    async remove(id: string) {
-        const { rows } = await this.db.query(`
-            UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1 
+    async remove(id: string): Promise<User> {
+        const { rows } = await this.db.query<User>(`
+            UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1
             RETURNING id, name, nickname, email, role, rider_level AS "riderLevel", join_date AS "joinDate", is_active AS "isActive"
         `, [id]);
 
@@ -172,5 +195,15 @@ export class UsersService {
         }
 
         return rows[0];
+    }
+
+    async getUserClubs(userId: string): Promise<{ club_id: string; role: UserRole }[]> {
+        const { rows } = await this.db.query<{ club_id: string; role: UserRole }>(
+            `SELECT club_id, role
+             FROM club_members
+             WHERE user_id = $1 AND is_active = TRUE`,
+            [userId],
+        );
+        return rows;
     }
 }

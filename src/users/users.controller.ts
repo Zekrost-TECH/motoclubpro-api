@@ -8,68 +8,76 @@ import {
     Delete,
     UseGuards,
     Request,
+    Query,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ClubGuard } from '../auth/guards/club.guard';
+import { SelfOrAdminGuard } from '../auth/guards/self-or-admin.guard';
 import { UserRole } from './users.types';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CurrentClub } from '../auth/decorators/club.decorator';
+import type { AuthRequest } from '../auth/auth.types';
+import type { User } from './users.types';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('users')
+@UseGuards(JwtAuthGuard, ClubGuard, RolesGuard)
 export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Post()
-    @Roles(UserRole.admin, UserRole.lider)
-    create(@Body() createUserDto: CreateUserDto) {
+    @Roles(UserRole.admin)
+    create(@Body() createUserDto: CreateUserDto): Promise<User> {
         return this.usersService.createUser(createUserDto);
     }
 
     @Get()
     @Roles(UserRole.admin, UserRole.lider, UserRole.piloto)
-    findAll() {
-        return this.usersService.findAll();
+    findAll(@CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: User[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+        return this.usersService.findAll(clubId, pagination?.page, pagination?.limit);
     }
 
     @Get('me')
-    getMe(@Request() req) {
+    getMe(@Request() req: AuthRequest): Promise<User & { motorcycle?: unknown; userPositions?: unknown }> {
         return this.usersService.findOne(req.user.id);
     }
 
     @Patch('me')
-    updateMe(@Request() req, @Body() updateUserDto: UpdateUserDto) {
-        console.log('Received updateMe request:', { userId: req.user.id, updateUserDto });
+    updateMe(@Request() req: AuthRequest, @Body() updateUserDto: UpdateUserDto): Promise<User> {
         return this.usersService.updateUser(req.user.id, updateUserDto);
     }
 
     @Get(':id')
-    findOne(@Param('id') id: string) {
-        // auth guard is active, assuming users can read regular profiles
+    @UseGuards(SelfOrAdminGuard)
+    findOne(@Param('id') id: string): Promise<User & { motorcycle?: unknown; userPositions?: unknown }> {
         return this.usersService.findOne(id);
     }
 
     @Patch(':id')
+    @UseGuards(SelfOrAdminGuard)
     update(
         @Param('id') id: string,
         @Body() updateUserDto: UpdateUserDto,
-    ) {
-        // Note: should implement owner/admin check guard here to restrict updates
+    ): Promise<User> {
         return this.usersService.updateUser(id, updateUserDto);
     }
 
     @Get(':id/medical')
-    getMedicalInfo(@Param('id') id: string) {
-        // Note: should implement self/admin check guard
+    @UseGuards(SelfOrAdminGuard)
+    getMedicalInfo(@Param('id') id: string): Promise<User> {
         return this.usersService.getMedicalInfo(id);
     }
 
     @Delete(':id')
     @Roles(UserRole.admin)
-    remove(@Param('id') id: string) {
+    remove(@Param('id') id: string): Promise<User> {
         return this.usersService.remove(id);
     }
 }

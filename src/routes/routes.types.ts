@@ -23,7 +23,7 @@ export interface Route {
     estimatedTime?: string;
     elevationMin?: number;
     elevationMax?: number;
-    geojson?: any;
+    geojson?: Record<string, unknown>;
     createdBy?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -34,7 +34,7 @@ export interface Waypoint {
     routeId: string;
     name?: string;
     // Location handled by PostGIS GeoJSON, we return it as GeoJSON coordinates
-    location: any;
+    location: Record<string, unknown>;
     type: WaypointType;
     estimatedArrival?: string;
     notes?: string;

@@ -1,28 +1,32 @@
 import * as admin from 'firebase-admin';
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class FcmService implements OnModuleInit {
+    constructor(private readonly configService: ConfigService) { }
 
     onModuleInit() {
         if (admin.apps.length > 0) return;
 
-        const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+        const privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY')?.replace(/\\n/g, '\n');
+        const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
+        const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
 
-        if (!process.env.FIREBASE_PROJECT_ID || !privateKey) {
-            console.warn('[FCM] Variables de entorno no configuradas — push deshabilitado');
+        if (!projectId || !privateKey) {
+            Logger.warn('[FCM] Variables de entorno no configuradas — push deshabilitado', 'FcmService');
             return;
         }
 
         admin.initializeApp({
             credential: admin.credential.cert({
-                projectId: process.env.FIREBASE_PROJECT_ID,
-                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                projectId,
+                clientEmail,
                 privateKey,
             }),
         });
 
-        console.log('[FCM] firebase-admin inicializado');
+        Logger.log('[FCM] firebase-admin inicializado', 'FcmService');
     }
 
     private get isReady(): boolean {
@@ -50,10 +54,10 @@ export class FcmService implements OnModuleInit {
                 .map(r => r.error?.message);
 
             if (failed.length) {
-                console.warn(`[FCM] ${failed.length} tokens fallidos:`, failed);
+                Logger.warn(`[FCM] ${failed.length} tokens fallidos: ${failed.join(', ')}`, 'FcmService');
             }
         } catch (err) {
-            console.error('[FCM] Error enviando push:', err);
+            Logger.error('[FCM] Error enviando push', err instanceof Error ? err.stack : String(err), 'FcmService');
         }
     }
 
