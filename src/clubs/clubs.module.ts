@@ -3,8 +3,10 @@ import { ClubsService } from './clubs.service';
 import { ClubsController } from './clubs.controller';
 import { ClubMemberGuard } from './guards/club-member.guard';
 import { ClubMemberRolesGuard } from './guards/club-member-roles.guard';
+import { UsersModule } from '../users/users.module';
 
 @Module({
+  imports: [UsersModule],
   controllers: [ClubsController],
   providers: [ClubsService, ClubMemberGuard, ClubMemberRolesGuard],
   exports: [ClubsService],

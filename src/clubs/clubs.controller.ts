@@ -60,7 +60,7 @@ export class ClubsController {
   @UseGuards(ClubMemberGuard, ClubMemberRolesGuard)
   @ClubRoles(UserRole.admin, UserRole.lider)
   async inviteMember(@Param('id') clubId: string, @Body() dto: InviteMemberDto): Promise<{ ok: boolean }> {
-    await this.clubsService.inviteMember(clubId, dto.userId, dto.role || 'piloto');
+    await this.clubsService.inviteMember(clubId, dto.userId, dto.email, dto.role || 'piloto');
     return { ok: true };
   }
 

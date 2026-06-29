@@ -3,6 +3,7 @@ import { ClubsController } from './clubs.controller';
 import { ClubsService } from './clubs.service';
 import { NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { UsersService } from '../users/users.service';
 import { Reflector } from '@nestjs/core';
 
 describe('ClubsController', () => {
@@ -29,6 +30,7 @@ describe('ClubsController', () => {
                     },
                 },
                 { provide: DatabaseService, useValue: { query: jest.fn() } },
+                { provide: UsersService, useValue: { findByEmail: jest.fn() } },
                 { provide: Reflector, useValue: new Reflector() },
             ],
         }).compile();
@@ -77,7 +79,7 @@ describe('ClubsController', () => {
             const dto = { userId: 'user-2', role: 'piloto' };
             const result = await controller.inviteMember('club-1', dto);
             expect(result).toEqual({ ok: true });
-            expect(service.inviteMember).toHaveBeenCalledWith('club-1', 'user-2', 'piloto');
+            expect(service.inviteMember).toHaveBeenCalledWith('club-1', 'user-2', undefined, 'piloto');
         });
     });
 

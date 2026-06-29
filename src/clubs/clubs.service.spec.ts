@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClubsService } from './clubs.service';
 import { DatabaseService } from '../database/database.service';
+import { UsersService } from '../users/users.service';
 
 describe('ClubsService', () => {
     let service: ClubsService;
@@ -21,6 +22,7 @@ describe('ClubsService', () => {
             providers: [
                 ClubsService,
                 { provide: DatabaseService, useValue: db },
+                { provide: UsersService, useValue: { findByEmail: jest.fn() } },
             ],
         }).compile();
 

@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { UsersService } from '../users/users.service';
 
 export interface ClubRow {
   id: string;
@@ -48,7 +49,10 @@ export interface SubscriptionRow {
 export class ClubsService {
   private readonly logger = new Logger(ClubsService.name);
 
-  constructor(private readonly db: DatabaseService) { }
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly usersService: UsersService,
+  ) { }
 
   async create(data: {
     name: string;
@@ -141,13 +145,24 @@ export class ClubsService {
     };
   }
 
-  async inviteMember(clubId: string, userId: string, role: string): Promise<void> {
+  async inviteMember(clubId: string, userId: string | undefined, email: string | undefined, role: string): Promise<void> {
+    let targetUserId = userId;
+    if (!targetUserId && email) {
+      const user = await this.usersService.findByEmail(email);
+      if (!user) {
+        throw new NotFoundException(`No user found with email ${email}`);
+      }
+      targetUserId = user.id;
+    }
+    if (!targetUserId) {
+      throw new BadRequestException('userId or email is required');
+    }
     await this.db.query(
       `INSERT INTO club_members (club_id, user_id, role)
        VALUES ($1, $2, $3)
        ON CONFLICT (club_id, user_id) DO UPDATE
        SET role = $3, is_active = TRUE`,
-      [clubId, userId, role],
+      [clubId, targetUserId, role],
     );
   }
 
