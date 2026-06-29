@@ -60,9 +60,9 @@ describe('SupportController', () => {
 
     describe('verify', () => {
         it('should verify a support point', async () => {
-            const result = await controller.verify('point-1');
+            const result = await controller.verify('point-1', { verified: true });
             expect(result).toEqual(mockVerify);
-            expect(service.verify).toHaveBeenCalledWith('point-1', undefined);
+            expect(service.verify).toHaveBeenCalledWith('point-1', true, undefined);
         });
     });
 

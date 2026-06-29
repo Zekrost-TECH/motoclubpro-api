@@ -27,6 +27,11 @@ export class CreateSupportDto {
     @IsNumber()
     lng!: number;
 
+    @ApiPropertyOptional({ description: 'City' })
+    @IsOptional()
+    @IsString()
+    city?: string;
+
     @ApiPropertyOptional({ description: 'Address' })
     @IsOptional()
     @IsString()
