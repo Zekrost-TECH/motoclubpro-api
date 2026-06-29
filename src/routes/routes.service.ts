@@ -44,7 +44,8 @@ export class RoutesService {
         let query = `SELECT id, name, description, difficulty, distance_km AS "distanceKm",
                     estimated_time AS "estimatedTime", elevation_min AS "elevationMin",
                     elevation_max AS "elevationMax", geojson, created_by AS "createdBy",
-                    created_at AS "createdAt", updated_at AS "updatedAt"
+                    created_at AS "createdAt", updated_at AS "updatedAt",
+                    (SELECT COUNT(*) FROM route_waypoints WHERE route_id = routes.id) AS "waypointsCount"
              FROM routes`;
         let countQuery = 'SELECT COUNT(*)::int as count FROM routes';
         const params: (string | null)[] = [];
