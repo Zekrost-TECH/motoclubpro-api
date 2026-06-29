@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req, ParseFloatPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SupportService, type SupportPointRow, type SupportPointSummary, type SupportPointVerify, type SupportPointReview } from './support.service';
 import { CreateSupportDto, SupportType } from './dto/create-support.dto';
@@ -19,13 +19,19 @@ export class SupportController {
 
     @Get()
     async search(
-        @Query('lat', ParseFloatPipe) lat: number,
-        @Query('lng', ParseFloatPipe) lng: number,
-        @Query('radius', ParseFloatPipe) radiusMs: number,
+        @Query('lat') lat?: string,
+        @Query('lng') lng?: string,
+        @Query('radius') radius?: string,
         @Query('type') type?: SupportType,
         @CurrentClub() clubId?: string,
     ): Promise<SupportPointRow[]> {
-        return await this.supportService.search(lat, lng, radiusMs, type, clubId);
+        const latNum = lat ? parseFloat(lat) : NaN;
+        const lngNum = lng ? parseFloat(lng) : NaN;
+        const radiusNum = radius ? parseFloat(radius) : NaN;
+        if (Number.isFinite(latNum) && Number.isFinite(lngNum) && Number.isFinite(radiusNum)) {
+            return await this.supportService.search(latNum, lngNum, radiusNum, type, clubId);
+        }
+        return await this.supportService.findAll(clubId);
     }
 
     @Post()

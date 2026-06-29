@@ -17,14 +17,15 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { UpdateEventStatusDto } from './dto/update-event-status.dto';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
+import { CreateChecklistItemDto } from './dto/create-checklist-item.dto';
 import { UpdateAttendeeRoleDto } from './dto/update-attendee-role.dto';
+import { FindEventsQueryDto } from './dto/find-events-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { EventCaptainGuard } from './guards/event-captain.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
 import { ClubRoles } from '../auth/decorators/club-role.decorator';
 import { ClubRolesGuard } from '../auth/guards/club-roles.guard';
 import { CurrentClub } from '../auth/decorators/club.decorator';
-import { PaginationDto } from '../common/dto/pagination.dto';
 import type { AuthRequest } from '../auth/auth.types';
 
 @Controller('events')
@@ -38,10 +39,10 @@ export class EventsController {
         @Query('status') status?: string,
         @Query('upcoming') upcoming?: string,
         @CurrentClub() clubId?: string,
-        @Query() pagination?: PaginationDto,
+        @Query() query?: FindEventsQueryDto,
     ): Promise<{ data: EventRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
         const isUpcoming = upcoming === 'true';
-        return this.eventsService.findAll(status, isUpcoming, clubId, pagination?.page, pagination?.limit);
+        return this.eventsService.findAll(status, isUpcoming, clubId, query?.page, query?.limit);
     }
 
     @Get(':id')
@@ -109,6 +110,26 @@ export class EventsController {
     @Get(':id/checklist')
     getChecklist(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<ChecklistItemRow[]> {
         return this.eventsService.getChecklist(id, clubId);
+    }
+
+    @Post(':id/checklist')
+    @ClubRoles(UserRole.admin, UserRole.lider)
+    addChecklistItem(
+        @Param('id') id: string,
+        @Body() dto: CreateChecklistItemDto,
+        @CurrentClub() clubId?: string,
+    ): Promise<ChecklistItemRow> {
+        return this.eventsService.addChecklistItem(id, dto.label, dto.required ?? false, clubId);
+    }
+
+    @Delete(':id/checklist/:itemId')
+    @ClubRoles(UserRole.admin, UserRole.lider)
+    removeChecklistItem(
+        @Param('id') id: string,
+        @Param('itemId') itemId: string,
+        @CurrentClub() clubId?: string,
+    ): Promise<{ deleted: boolean }> {
+        return this.eventsService.removeChecklistItem(id, itemId, clubId);
     }
 
     @Post(':id/checklist/respond')

@@ -43,6 +43,23 @@ export interface SupportPointReview {
 export class SupportService {
   constructor(private rawDb: DatabaseService) { }
 
+  async findAll(clubId?: string): Promise<SupportPointRow[]> {
+    let sql = `
+      SELECT id, name, type, address, phone, hours, rating, review_count, verified,
+             ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng,
+             0 AS dist_m
+      FROM support_points
+      WHERE 1=1`;
+    const params: (string | null)[] = [];
+    if (clubId) {
+      sql += ' AND club_id = $1';
+      params.push(clubId);
+    }
+    sql += ' ORDER BY name LIMIT 100;';
+    const result = await this.rawDb.query<SupportPointRow>(sql, params);
+    return result.rows;
+  }
+
   async search(lat: number, lng: number, radiusMs: number, type?: SupportType, clubId?: string): Promise<SupportPointRow[]> {
     const isFilterType = !!type;
     let sql = `

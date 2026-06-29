@@ -1,0 +1,114 @@
+version: "3.9"
+
+# Compose file for end-to-end local testing with non-conflicting ports.
+# Ports used: Postgres 15432, Redis 16379, API 13000, Tracker 18081, Adminer 18080.
+
+services:
+  # ── PostgreSQL + PostGIS ───────────────────────────────────────────────────
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: motoclubpro_postgres_e2e
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: motoclubpro
+      POSTGRES_USER: motoclubpro
+      POSTGRES_PASSWORD: dev_secret
+    ports:
+      - "15432:5432"
+    volumes:
+      - pgdata_e2e:/var/lib/postgresql/data
+      - ./src/infra/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./src/infra/seed.sql:/docker-entrypoint-initdb.d/seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U motoclubpro -d motoclubpro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: motoclubpro_redis_e2e
+    restart: unless-stopped
+    command: >
+      redis-server
+      --bind 0.0.0.0
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── API NestJS ─────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../motoclubpro-api
+      dockerfile: Dockerfile.dev
+      target: runner
+    container_name: motoclubpro_api_e2e
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports:
+      - "13000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://motoclubpro:dev_secret@postgres:5432/motoclubpro
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      JWT_EXPIRES_IN: 15m
+      REFRESH_SECRET: dev_refresh_secret_change_in_production
+      REFRESH_EXPIRES_IN: 30d
+      ALLOWED_ORIGINS: "http://localhost,http://localhost:5173,http://localhost:13000,http://localhost:3001,capacitor://localhost,https://localhost,http://10.0.2.2:13000"
+      # Dummy values for E2E — billing/payment flows are not exercised
+      WOMPI_PUBLIC_KEY: pub_test_dummy
+      WOMPI_PRIVATE_KEY: prv_test_dummy
+      WOMPI_EVENTS_SECRET: whsec_dummy
+      WOMPI_BASE_URL: https://sandbox.wompi.co/v1
+      ALEGRA_EMAIL: dummy@alegra.com
+      ALEGRA_API_KEY: dummy_alegra_key
+      ALEGRA_BASE_URL: https://app.alegra.com/api/v1
+
+  # ── Tracker Go ────────────────────────────────────────────────────────────
+  tracker:
+    build:
+      context: ../motoclubpro-tracker
+      dockerfile: Dockerfile.dev
+      target: builder
+    container_name: motoclubpro_tracker_e2e
+    restart: unless-stopped
+    depends_on:
+      redis: { condition: service_healthy }
+    ports:
+      - "18081:8081"
+    environment:
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      WS_PORT: 8081
+      ENV: development
+    command: go run ./cmd/tracker/main.go
+
+  # ── Adminer (UI para ver la DB en dev) ────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: motoclubpro_adminer_e2e
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports:
+      - "18080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha
+
+volumes:
+  pgdata_e2e:
+    name: motoclubpro_pgdata_e2e

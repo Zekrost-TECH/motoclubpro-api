@@ -51,10 +51,16 @@ export class AuthController {
         return { message: 'Logged out successfully' };
     }
 
+    @Get('me')
+    @UseGuards(JwtAuthGuard)
+    async me(@Request() req: AuthRequest): Promise<Omit<AuthResponse['user'], 'clubs'>> {
+        return await this.authService.getMe(req.user.id);
+    }
+
     @Get('clubs')
     @UseGuards(JwtAuthGuard)
-    async clubs(@Request() req: AuthRequest): Promise<{ club_id: string; role: string; name: string; slug: string; logo_url: string | null; city: string | null; department: string | null }[]> {
-        return this.authService.getUserClubs(req.user.id);
+    async clubs(@Request() req: AuthRequest): Promise<{ clubs: { club_id: string; role: string; name: string; slug: string; description: string | null; logo_url: string | null; city: string | null; department: string | null }[]; activeClubId: string | null }> {
+        return { clubs: await this.authService.getUserClubs(req.user.id), activeClubId: null };
     }
 
     @Post('switch-club')

@@ -9,7 +9,7 @@ describe('EventsService', () => {
 
     const mockEvent: EventRow = {
         id: 'event-1',
-        status: 'próximo',
+        status: 'proximo',
         title: 'Test Event',
         description: 'Desc',
         date: '2026-01-01',
@@ -94,7 +94,7 @@ describe('EventsService', () => {
                 .mockResolvedValueOnce({ rows: [] })
                 .mockResolvedValueOnce({ rows: [] });
 
-            const result = await service.findAll('próximo', true);
+            const result = await service.findAll('proximo', true);
             expect(result.data).toHaveLength(1);
         });
     });
@@ -156,10 +156,10 @@ describe('EventsService', () => {
                 .mockResolvedValueOnce({ rows: [draftEvent] })
                 .mockResolvedValueOnce({ rows: [] })
                 .mockResolvedValueOnce({ rows: [] })
-                .mockResolvedValueOnce({ rows: [{ ...draftEvent, status: 'próximo' }] });
+                .mockResolvedValueOnce({ rows: [{ ...draftEvent, status: 'proximo' }] });
 
-            const result = await service.updateStatus('event-1', 'próximo');
-            expect(result.status).toBe('próximo');
+            const result = await service.updateStatus('event-1', 'proximo');
+            expect(result.status).toBe('proximo');
         });
 
         it('should throw BadRequestException for invalid transition', async () => {

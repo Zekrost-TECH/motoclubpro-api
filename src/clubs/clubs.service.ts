@@ -8,6 +8,7 @@ export interface ClubRow {
   logo_url: string | null;
   city: string | null;
   department: string | null;
+  description: string | null;
   nit: string | null;
   billing_address: string | null;
   billing_phone: string | null;
@@ -106,7 +107,7 @@ export class ClubsService {
 
   async findBySlug(slug: string): Promise<ClubRow | null> {
     const { rows } = await this.db.query<ClubRow>(
-      `SELECT id, name, slug, logo_url, city, department, nit,
+      `SELECT id, name, slug, logo_url, city, department, description, nit,
               billing_address, billing_phone, billing_contact_name,
               billing_contact_email, tax_regime, is_active, created_at
        FROM clubs
@@ -193,12 +194,13 @@ export class ClubsService {
        SET name = COALESCE($1, name),
            city = COALESCE($2, city),
            department = COALESCE($3, department),
+           description = COALESCE($4, description),
            updated_at = NOW()
-       WHERE id = $4
-       RETURNING id, name, slug, logo_url, city, department, nit,
+       WHERE id = $5
+       RETURNING id, name, slug, logo_url, city, department, description, nit,
                  billing_address, billing_phone, billing_contact_name,
                  billing_contact_email, tax_regime, is_active, created_at`,
-      [data.name ?? null, data.city ?? null, data.department ?? null, clubId],
+      [data.name ?? null, data.city ?? null, data.department ?? null, data.description ?? null, clubId],
     );
     return rows[0];
   }

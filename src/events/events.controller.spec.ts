@@ -12,7 +12,7 @@ describe('EventsController', () => {
 
     const mockEvent: EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[] } = {
         id: 'event-1',
-        status: 'próximo',
+        status: 'proximo',
         title: 'Test Event',
         description: 'Desc',
         date: '2026-01-01',
@@ -67,9 +67,9 @@ describe('EventsController', () => {
 
     describe('findAll', () => {
         it('should return paginated events', async () => {
-            const result = await controller.findAll('próximo', 'true', 'club-1', { page: 1, limit: 10 });
+            const result = await controller.findAll('proximo', 'true', 'club-1', { page: 1, limit: 10 });
             expect(result.data).toHaveLength(1);
-            expect(serviceMock.findAll).toHaveBeenCalledWith('próximo', true, 'club-1', 1, 10);
+            expect(serviceMock.findAll).toHaveBeenCalledWith('proximo', true, 'club-1', 1, 10);
         });
     });
 
@@ -102,10 +102,10 @@ describe('EventsController', () => {
 
     describe('updateStatus', () => {
         it('should update event status', async () => {
-            const dto = { status: 'en-curso' as const };
+            const dto = { status: 'en_curso' as const };
             const result = await controller.updateStatus('event-1', dto as any, 'club-1');
             expect(result.id).toBe('event-1');
-            expect(serviceMock.updateStatus).toHaveBeenCalledWith('event-1', 'en-curso', 'club-1');
+            expect(serviceMock.updateStatus).toHaveBeenCalledWith('event-1', 'en_curso', 'club-1');
         });
     });
 

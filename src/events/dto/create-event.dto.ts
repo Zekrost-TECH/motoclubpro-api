@@ -29,9 +29,9 @@ export class CreateEventDto {
     @IsUUID()
     route_id?: string;
 
-    @ApiPropertyOptional({ description: 'Event status', enum: ['borrador', 'próximo', 'en-curso', 'completado', 'cancelado'] })
+    @ApiPropertyOptional({ description: 'Event status', enum: ['borrador', 'proximo', 'en_curso', 'completado', 'cancelado'] })
     @IsOptional()
-    @IsEnum(['borrador', 'próximo', 'en-curso', 'completado', 'cancelado'])
+    @IsEnum(['borrador', 'proximo', 'en_curso', 'completado', 'cancelado'])
     status?: EventStatus;
 
     @ApiPropertyOptional({ description: 'Maximum attendees' })

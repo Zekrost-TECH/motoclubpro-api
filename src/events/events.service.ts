@@ -254,9 +254,9 @@ export class EventsService {
     async updateStatus(id: string, newStatus: string, clubId?: string): Promise<EventRow> {
         const event = await this.findOne(id, clubId);
         const validTransitions: Record<string, string[]> = {
-            'borrador': ['próximo', 'cancelado'],
-            'próximo': ['en-curso', 'cancelado'],
-            'en-curso': ['completado', 'cancelado'],
+            'borrador': ['proximo', 'cancelado'],
+            'proximo': ['en_curso', 'cancelado'],
+            'en_curso': ['completado', 'cancelado'],
             'completado': [],
             'cancelado': []
         };
@@ -299,7 +299,7 @@ export class EventsService {
         const event = await this.findOne(eventId, clubId);
 
         if (event.status !== 'proximo') {
-            throw new BadRequestException('Can only RSVP to events that are "próximo"');
+            throw new BadRequestException('Can only RSVP to events that are "proximo"');
         }
 
         // Validate max attendees
@@ -419,6 +419,31 @@ export class EventsService {
             [eventId],
         );
         return res.rows;
+    }
+
+    async addChecklistItem(eventId: string, label: string, required: boolean, clubId?: string): Promise<ChecklistItemRow> {
+        await this.verifyEventClub(eventId, clubId);
+        const res = await this.db.query<ChecklistItemRow>(
+            `INSERT INTO checklist_items (event_id, label, required, sort_order)
+       VALUES ($1, $2, $3, COALESCE((SELECT MAX(sort_order) FROM checklist_items WHERE event_id = $1), 0) + 1)
+       RETURNING *`,
+            [eventId, label, required],
+        );
+        return res.rows[0];
+    }
+
+    async removeChecklistItem(eventId: string, itemId: string, clubId?: string): Promise<{ deleted: boolean }> {
+        await this.verifyEventClub(eventId, clubId);
+        await this.db.query(
+            `DELETE FROM checklist_responses WHERE item_id = $1`,
+            [itemId],
+        );
+        const res = await this.db.query<ChecklistItemRow>(
+            `DELETE FROM checklist_items WHERE id = $1 AND event_id = $2 RETURNING *`,
+            [itemId, eventId],
+        );
+        if (!res.rows[0]) throw new NotFoundException('Checklist item not found');
+        return { deleted: true };
     }
 
     async respondChecklist(eventId: string, userId: string, responses: { itemId: string; checked: boolean }[], clubId?: string): Promise<{ success: boolean; checklist_completed: boolean }> {

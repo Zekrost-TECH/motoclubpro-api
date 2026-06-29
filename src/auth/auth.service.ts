@@ -100,6 +100,14 @@ export class AuthService {
         }
     }
 
+    async getMe(userId: string): Promise<Omit<User, 'passwordHash'>> {
+        const user = await this.usersService.findOne(userId);
+        if (!user) throw new UnauthorizedException('Usuario no encontrado');
+        const { passwordHash: _pw, ...result } = user;
+        void _pw;
+        return result as Omit<User, 'passwordHash'>;
+    }
+
     async logout(refreshToken?: string, accessToken?: string): Promise<void> {
         if (refreshToken) {
             await this.redis.set(
@@ -121,17 +129,18 @@ export class AuthService {
         }
     }
 
-    async getUserClubs(userId: string): Promise<{ club_id: string; role: UserRole; name: string; slug: string; logo_url: string | null; city: string | null; department: string | null }[]> {
+    async getUserClubs(userId: string): Promise<{ club_id: string; role: UserRole; name: string; slug: string; description: string | null; logo_url: string | null; city: string | null; department: string | null }[]> {
         const { rows } = await this.db.query<{
             club_id: string;
             role: UserRole;
             name: string;
             slug: string;
+            description: string | null;
             logo_url: string | null;
             city: string | null;
             department: string | null;
         }>(
-            `SELECT c.id as club_id, cm.role, c.name, c.slug, c.logo_url, c.city, c.department
+            `SELECT c.id as club_id, cm.role, c.name, c.slug, c.description, c.logo_url, c.city, c.department
              FROM club_members cm
              JOIN clubs c ON c.id = cm.club_id
              WHERE cm.user_id = $1 AND cm.is_active = TRUE AND c.is_active = TRUE

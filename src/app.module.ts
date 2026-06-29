@@ -15,6 +15,7 @@ import { SosModule } from './sos/sos.module';
 import { SupportModule } from './support/support.module';
 import { RedisModule } from './redis/redis.module';
 import { BillingModule } from './billing/billing.module';
+import { ReportsModule } from './reports/reports.module';
 import { ClubsModule } from './clubs/clubs.module';
 import { HealthModule } from './health/health.module';
 
@@ -45,6 +46,7 @@ import { HealthModule } from './health/health.module';
     SosModule,
     SupportModule,
     BillingModule,
+    ReportsModule,
     HealthModule,
     ClubsModule,
   ],
