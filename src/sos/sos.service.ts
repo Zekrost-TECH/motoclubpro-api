@@ -7,6 +7,7 @@ import { FcmService } from '../notifications/fcm.service';
 export interface SosAlertRow {
     id: string;
     user_id: string;
+    user_name?: string;
     event_id?: string;
     club_id?: string;
     type: string;
@@ -105,20 +106,21 @@ export class SosService {
 
     async findAll(clubId?: string, page = 1, limit = 20): Promise<{ data: SosAlertRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
         let query = `
-            SELECT id, user_id, event_id, type, status, description,
-                   resolved_by, created_at, resolved_at,
-                   ST_Y(location::geometry) as lat,
-                   ST_X(location::geometry) as lng
-            FROM sos_alerts`;
+            SELECT s.id, s.user_id, u.name AS user_name, s.event_id, s.type, s.status, s.description,
+                   s.resolved_by, s.created_at, s.resolved_at,
+                   ST_Y(s.location::geometry) as lat,
+                   ST_X(s.location::geometry) as lng
+            FROM sos_alerts s
+            LEFT JOIN users u ON u.id = s.user_id`;
         let countQuery = `SELECT COUNT(*)::int as count FROM sos_alerts`;
         const params: (string | null)[] = [];
 
         if (clubId) {
-            query += ' WHERE club_id = $1';
+            query += ' WHERE s.club_id = $1';
             countQuery += ' WHERE club_id = $1';
             params.push(clubId);
         }
-        query += ' ORDER BY created_at DESC';
+        query += ' ORDER BY s.created_at DESC';
 
         const offset = (page - 1) * limit;
         query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
@@ -137,20 +139,21 @@ export class SosService {
 
     async findActive(clubId?: string, page = 1, limit = 20): Promise<{ data: SosAlertRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
         let query = `
-            SELECT id, user_id, event_id, type, status, description, created_at,
-                   ST_Y(location::geometry) as lat,
-                   ST_X(location::geometry) as lng
-            FROM sos_alerts
-            WHERE status = 'activa'`;
+            SELECT s.id, s.user_id, u.name AS user_name, s.event_id, s.type, s.status, s.description, s.created_at,
+                   ST_Y(s.location::geometry) as lat,
+                   ST_X(s.location::geometry) as lng
+            FROM sos_alerts s
+            LEFT JOIN users u ON u.id = s.user_id
+            WHERE s.status = 'activa'`;
         let countQuery = `SELECT COUNT(*)::int as count FROM sos_alerts WHERE status = 'activa'`;
         const params: (string | null)[] = [];
 
         if (clubId) {
-            query += ' AND club_id = $1';
+            query += ' AND s.club_id = $1';
             countQuery += ' AND club_id = $1';
             params.push(clubId);
         }
-        query += ' ORDER BY created_at DESC';
+        query += ' ORDER BY s.created_at DESC';
 
         const offset = (page - 1) * limit;
         query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;

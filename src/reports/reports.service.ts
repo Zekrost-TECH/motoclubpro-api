@@ -19,6 +19,20 @@ interface MemberReportRow {
     avg_skill: number;
 }
 
+interface FinancialReportRow {
+    total_paid: number;
+    total_pending: number;
+    total_failed: number;
+    transactions_count: number;
+}
+
+interface SupportPointsReportRow {
+    total: number;
+    verified: number;
+    pending: number;
+    avg_rating: number;
+}
+
 @Injectable()
 export class ReportsService {
     constructor(private readonly db: DatabaseService) { }
@@ -79,5 +93,34 @@ export class ReportsService {
             [clubId],
         );
         return rows[0] ?? { total: 0, active_this_month: 0, avg_skill: 0 };
+    }
+
+    async financialReport(clubId: string, from: string, to: string): Promise<FinancialReportRow> {
+        const { rows } = await this.db.query<FinancialReportRow>(
+            `SELECT
+                COALESCE(SUM(amount_cents) FILTER (WHERE status = 'approved'), 0)::numeric / 100 AS total_paid,
+                COALESCE(SUM(amount_cents) FILTER (WHERE status = 'pending'), 0)::numeric / 100 AS total_pending,
+                COALESCE(SUM(amount_cents) FILTER (WHERE status = 'failed'), 0)::numeric / 100 AS total_failed,
+                COUNT(*)::int AS transactions_count
+             FROM payment_transactions
+             WHERE club_id = $1
+               AND paid_at BETWEEN $2 AND $3`,
+            [clubId, from, to],
+        );
+        return rows[0] ?? { total_paid: 0, total_pending: 0, total_failed: 0, transactions_count: 0 };
+    }
+
+    async supportPointsReport(clubId: string): Promise<SupportPointsReportRow> {
+        const { rows } = await this.db.query<SupportPointsReportRow>(
+            `SELECT
+                COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE verified = TRUE)::int AS verified,
+                COUNT(*) FILTER (WHERE verified = FALSE)::int AS pending,
+                COALESCE(AVG(rating), 0)::numeric AS avg_rating
+             FROM support_points
+             WHERE club_id = $1`,
+            [clubId],
+        );
+        return rows[0] ?? { total: 0, verified: 0, pending: 0, avg_rating: 0 };
     }
 }

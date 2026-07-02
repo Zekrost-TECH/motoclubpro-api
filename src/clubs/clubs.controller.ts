@@ -59,8 +59,8 @@ export class ClubsController {
   @Post(':id/members')
   @UseGuards(ClubMemberGuard, ClubMemberRolesGuard)
   @ClubRoles(UserRole.admin, UserRole.lider)
-  async inviteMember(@Param('id') clubId: string, @Body() dto: InviteMemberDto): Promise<{ ok: boolean }> {
-    await this.clubsService.inviteMember(clubId, dto.userId, dto.email, dto.role || 'piloto');
+  async inviteMember(@Param('id') clubId: string, @Body() dto: InviteMemberDto, @Request() req: AuthRequest): Promise<{ ok: boolean }> {
+    await this.clubsService.inviteMember(clubId, dto.userId, dto.email, dto.role || 'piloto', req.user);
     return { ok: true };
   }
 

@@ -1,6 +1,10 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
+import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from '../users/users.service';
+import { MailService } from '../notifications/mail.service';
+import type { AuthUser } from '../auth/auth.types';
 
 export interface ClubRow {
   id: string;
@@ -52,6 +56,7 @@ export class ClubsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly usersService: UsersService,
+    private readonly mailService: MailService,
   ) { }
 
   async create(data: {
@@ -145,15 +150,45 @@ export class ClubsService {
     };
   }
 
-  async inviteMember(clubId: string, userId: string | undefined, email: string | undefined, role: string): Promise<void> {
+  async inviteMember(clubId: string, userId: string | undefined, email: string | undefined, role: string, invitedBy?: AuthUser): Promise<void> {
     let targetUserId = userId;
+
     if (!targetUserId && email) {
-      const user = await this.usersService.findByEmail(email);
-      if (!user) {
-        throw new NotFoundException(`No user found with email ${email}`);
+      const existing = await this.usersService.findByEmail(email);
+      if (existing) {
+        targetUserId = existing.id;
+      } else {
+        const tempPassword = randomBytes(6).toString('hex');
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        const nameFromEmail = email.split('@')[0];
+
+        const { rows } = await this.db.query<{ id: string }>(
+          `INSERT INTO users (id, name, email, role, rider_level, password_hash, join_date, is_active)
+           VALUES (gen_random_uuid(), $1, $2, 'piloto', 'novato', $3, NOW(), true)
+           RETURNING id`,
+          [nameFromEmail, email, hashedPassword],
+        );
+        targetUserId = rows[0].id;
+
+        const { rows: clubRows } = await this.db.query<{ name: string }>(
+          `SELECT name FROM clubs WHERE id = $1`,
+          [clubId],
+        );
+        const clubName = clubRows[0]?.name || 'tu club';
+        const loginUrl = process.env.WEB_URL || 'http://localhost:5173/login';
+
+        await this.mailService.sendInvitation({
+          email,
+          clubName,
+          inviterName: invitedBy?.email || 'Un administrador',
+          tempPassword,
+          loginUrl,
+        }).catch((err) => {
+          this.logger.warn(`Failed to send invitation email to ${email}: ${err.message}`);
+        });
       }
-      targetUserId = user.id;
     }
+
     if (!targetUserId) {
       throw new BadRequestException('userId or email is required');
     }

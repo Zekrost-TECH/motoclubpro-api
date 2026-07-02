@@ -49,4 +49,30 @@ export class ReportsController {
             avgSkill: Number(r.avg_skill),
         };
     }
+
+    @Get('financial')
+    async financial(
+        @Query('from') from: string,
+        @Query('to') to: string,
+        @CurrentClub() clubId: string,
+    ) {
+        const r = await this.reportsService.financialReport(clubId, from, to);
+        return {
+            totalPaid: Number(r.total_paid),
+            totalPending: Number(r.total_pending),
+            totalFailed: Number(r.total_failed),
+            transactionsCount: Number(r.transactions_count),
+        };
+    }
+
+    @Get('support-points')
+    async supportPoints(@CurrentClub() clubId: string) {
+        const r = await this.reportsService.supportPointsReport(clubId);
+        return {
+            total: Number(r.total),
+            verified: Number(r.verified),
+            pending: Number(r.pending),
+            avgRating: Number(r.avg_rating),
+        };
+    }
 }
