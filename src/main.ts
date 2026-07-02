@@ -128,7 +128,7 @@ async function bootstrap() {
   const host = '0.0.0.0';
 
   await app.listen(port, host);
-  Logger.log(`IronBykers API corriendo en http://${host}:${port}/api/v1`, 'Bootstrap');
+  Logger.log(`Ironbikers API corriendo en http://${host}:${port}/api/v1`, 'Bootstrap');
   if (swaggerEnabled) {
     Logger.log(`Swagger docs available at http://${host}:${port}/api/docs`, 'Bootstrap');
   }
