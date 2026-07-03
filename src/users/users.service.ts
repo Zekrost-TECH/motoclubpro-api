@@ -48,7 +48,8 @@ export class UsersService {
 
         if (clubId) {
             query = `
-                SELECT u.id, u.name, u.nickname, u.email, u.role, u.rider_level AS "riderLevel", u.join_date AS "joinDate", u.is_active AS "isActive"
+                SELECT u.id, u.name, u.nickname, u.email, u.role, u.rider_level AS "riderLevel", u.join_date AS "joinDate",
+                       u.rides_completed AS "ridesCompleted", u.total_km AS "totalKm", u.is_active AS "isActive"
                 FROM users u
                 JOIN club_members cm ON u.id = cm.user_id
                 WHERE cm.club_id = $1 AND cm.is_active = TRUE AND u.is_active = true
@@ -57,7 +58,8 @@ export class UsersService {
             params = [clubId];
         } else {
             query = `
-                SELECT id, name, nickname, email, role, rider_level AS "riderLevel", join_date AS "joinDate", is_active AS "isActive"
+                SELECT id, name, nickname, email, role, rider_level AS "riderLevel", join_date AS "joinDate",
+                       rides_completed AS "ridesCompleted", total_km AS "totalKm", is_active AS "isActive"
                 FROM users
                 WHERE is_active = true
             `;
