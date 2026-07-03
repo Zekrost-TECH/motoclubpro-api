@@ -32,7 +32,7 @@ export class UsersService {
                 data.name,
                 data.nickname,
                 data.email,
-                data.role || 'piloto',
+                data.role || 'rider',
                 data.riderLevel || 'novato',
                 hashedPassword
             ]
@@ -198,6 +198,22 @@ export class UsersService {
     }
 
     async getUserClubs(userId: string): Promise<{ club_id: string; role: UserRole }[]> {
+        const userRows = await this.db.query<{ role: UserRole }>(
+            `SELECT role FROM users WHERE id = $1`,
+            [userId],
+        );
+        const userRole = userRows.rows[0]?.role;
+
+        if (userRole === UserRole.superadmin) {
+            const { rows } = await this.db.query<{ club_id: string; role: UserRole }>(
+                `SELECT c.id as club_id, $1::user_role as role
+                 FROM clubs c
+                 WHERE c.is_active = TRUE`,
+                [UserRole.superadmin],
+            );
+            return rows;
+        }
+
         const { rows } = await this.db.query<{ club_id: string; role: UserRole }>(
             `SELECT club_id, role
              FROM club_members

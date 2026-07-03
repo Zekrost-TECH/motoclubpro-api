@@ -11,10 +11,12 @@ import { UsersModule } from './users/users.module';
 import { MotorcyclesModule } from './motorcycles/motorcycles.module';
 import { RoutesModule } from './routes/routes.module';
 import { EventsModule } from './events/events.module';
+import { RideRolesModule } from './ride-roles/ride-roles.module';
 import { SosModule } from './sos/sos.module';
 import { SupportModule } from './support/support.module';
 import { RedisModule } from './redis/redis.module';
 import { BillingModule } from './billing/billing.module';
+import { PlansModule } from './plans/plans.module';
 import { ReportsModule } from './reports/reports.module';
 import { ClubsModule } from './clubs/clubs.module';
 import { HealthModule } from './health/health.module';
@@ -42,10 +44,12 @@ import { HealthModule } from './health/health.module';
     MotorcyclesModule,
     RoutesModule,
     EventsModule,
+    RideRolesModule,
     RedisModule,
     SosModule,
     SupportModule,
     BillingModule,
+    PlansModule,
     ReportsModule,
     HealthModule,
     ClubsModule,

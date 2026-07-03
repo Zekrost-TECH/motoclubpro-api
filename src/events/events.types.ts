@@ -1,6 +1,6 @@
 export type EventStatus = 'borrador' | 'proximo' | 'en_curso' | 'completado' | 'cancelado';
 export type RiderLevel = 'novato' | 'basico' | 'intermedio' | 'avanzado' | 'experto';
-export type RideRole = 'puntero' | 'barredora' | 'capitan_ruta' | 'bloqueador' | 'cierre_seguridad' | 'jefe_armas' | 'primeros_auxilios' | 'coordinador_logistico' | 'comunicador' | 'rider';
+export type RideRole = string;
 export type InventoryCategory = 'herramienta' | 'seguridad' | 'comida' | 'otros';
 export type RouteDifficulty = 'suave' | 'moderada' | 'expertos' | 'off_road' | 'viaje_largo';
 

@@ -21,7 +21,7 @@ export class CreateUserDto {
     @IsString()
     nickname?: string;
 
-    @ApiPropertyOptional({ description: 'User role', enum: UserRole, default: UserRole.piloto })
+    @ApiPropertyOptional({ description: 'User role', enum: UserRole, default: UserRole.rider })
     @IsOptional()
     @IsEnum(UserRole)
     role?: UserRole;

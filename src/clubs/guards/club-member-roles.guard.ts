@@ -1,18 +1,19 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { DatabaseService } from '../../database/database.service';
 import { CLUB_ROLES_KEY } from '../../auth/decorators/club-role.decorator';
 import { UserRole } from '../../users/users.types';
 import type { AuthRequest } from '../../auth/auth.types';
 
+interface ClubMember {
+    club_id: string;
+    role: UserRole;
+}
+
 @Injectable()
 export class ClubMemberRolesGuard implements CanActivate {
-    constructor(
-        private readonly reflector: Reflector,
-        private readonly db: DatabaseService,
-    ) { }
+    constructor(private readonly reflector: Reflector) { }
 
-    async canActivate(context: ExecutionContext): Promise<boolean> {
+    canActivate(context: ExecutionContext): boolean {
         const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(CLUB_ROLES_KEY, [
             context.getHandler(),
             context.getClass(),
@@ -34,12 +35,9 @@ export class ClubMemberRolesGuard implements CanActivate {
             return true;
         }
 
-        const { rows } = await this.db.query<{ role: UserRole }>(
-            'SELECT role FROM club_members WHERE club_id = $1 AND user_id = $2 AND is_active = TRUE LIMIT 1',
-            [clubId, user.id],
-        );
+        const member = (user.clubs as ClubMember[] | undefined)?.find((c) => c.club_id === clubId);
 
-        if (rows.length === 0 || !requiredRoles.includes(rows[0].role)) {
+        if (!member || !requiredRoles.includes(member.role)) {
             throw new ForbiddenException('Insufficient role in this club');
         }
 

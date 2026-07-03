@@ -28,6 +28,7 @@
         "class-validator": "^0.15.1",
         "firebase-admin": "^13.7.0",
         "ioredis": "^5.10.1",
+        "nodemailer": "^9.0.3",
         "passport": "^0.7.0",
         "passport-jwt": "^4.0.1",
         "passport-local": "^1.0.0",
@@ -49,6 +50,7 @@
         "@types/express": "^5.0.0",
         "@types/jest": "^30.0.0",
         "@types/node": "^25.5.0",
+        "@types/nodemailer": "^8.0.1",
         "@types/passport-jwt": "^4.0.1",
         "@types/passport-local": "^1.0.38",
         "@types/supertest": "^7.2.0",
@@ -677,6 +679,8 @@
     "@types/ms": ["@types/ms@2.1.0", "", {}, ""],
 
     "@types/node": ["@types/node@25.5.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, ""],
+
+    "@types/nodemailer": ["@types/nodemailer@8.0.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw=="],
 
     "@types/passport": ["@types/passport@1.0.17", "", { "dependencies": { "@types/express": "*" } }, ""],
 
@@ -1511,6 +1515,8 @@
     "node-int64": ["node-int64@0.4.0", "", {}, ""],
 
     "node-releases": ["node-releases@2.0.36", "", {}, ""],
+
+    "nodemailer": ["nodemailer@9.0.3", "", {}, "sha512-n+YP+NKwR5zRWa60k3GiQ6Q3B4KXCoAw40dAKeCtYn020iNN74aWK2liXIC3ZEATeGql7we3tE3t8QwhY0eskw=="],
 
     "normalize-path": ["normalize-path@3.0.0", "", {}, ""],
 

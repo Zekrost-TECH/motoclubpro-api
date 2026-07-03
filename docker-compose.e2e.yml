@@ -1,7 +1,8 @@
 version: "3.9"
 
 # Compose file for end-to-end local testing with non-conflicting ports.
-# Ports used: Postgres 15432, Redis 16379, API 13000, Tracker 18081, Adminer 18080.
+# Ports used: Postgres 15432, Redis 16379, API 13000, Tracker 18081, Adminer 18080,
+#             MailPit SMTP 18025, MailPit Web UI 18026.
 
 services:
   # ── PostgreSQL + PostGIS ───────────────────────────────────────────────────
@@ -76,6 +77,12 @@ services:
       ALEGRA_EMAIL: dummy@alegra.com
       ALEGRA_API_KEY: dummy_alegra_key
       ALEGRA_BASE_URL: https://app.alegra.com/api/v1
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_USER: ""
+      SMTP_PASS: ""
+      SMTP_FROM: noreply@motoclubpro.local
+      WEB_URL: http://localhost:5173
 
   # ── Tracker Go ────────────────────────────────────────────────────────────
   tracker:
@@ -109,6 +116,27 @@ services:
       ADMINER_DEFAULT_SERVER: postgres
       ADMINER_DESIGN: pepa-linha
 
+  # ── MailPit (SMTP trap + Web UI para ver correos en dev) ──────────────────
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: motoclubpro_mailpit_e2e
+    restart: unless-stopped
+    ports:
+      - "18025:1025" # SMTP server
+      - "18026:8025" # Web UI
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: 500
+    volumes:
+      - mailpit_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025/api/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   pgdata_e2e:
     name: motoclubpro_pgdata_e2e
+  mailpit_data:
+    name: motoclubpro_mailpit_data

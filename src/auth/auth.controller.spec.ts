@@ -27,8 +27,8 @@ describe('AuthController', () => {
 
     describe('login', () => {
         it('should return tokens on valid credentials', async () => {
-            const mockUser = { id: 'u1', email: 't@test.com', role: UserRole.piloto };
-            const mockResponse = { access_token: 'at', refresh_token: 'rt', user: { id: 'u1', email: 't@test.com', role: UserRole.piloto, clubs: [] } };
+            const mockUser = { id: 'u1', email: 't@test.com', role: UserRole.rider };
+            const mockResponse = { access_token: 'at', refresh_token: 'rt', user: { id: 'u1', email: 't@test.com', role: UserRole.rider, clubs: [] } };
             authService.validateUser.mockResolvedValue(mockUser as never);
             authService.login.mockResolvedValue(mockResponse as never);
 
@@ -45,7 +45,7 @@ describe('AuthController', () => {
 
     describe('register', () => {
         it('should return tokens after registration', async () => {
-            const mockResponse = { access_token: 'at', refresh_token: 'rt', user: { id: 'u1', email: 't@test.com', role: UserRole.piloto, clubs: [] } };
+            const mockResponse = { access_token: 'at', refresh_token: 'rt', user: { id: 'u1', email: 't@test.com', role: UserRole.rider, clubs: [] } };
             authService.register.mockResolvedValue(mockResponse as never);
 
             const result = await controller.register({ email: 't@test.com', password: 'pass', name: 'Test' } as never);
@@ -69,7 +69,7 @@ describe('AuthController', () => {
         it('should return success message', async () => {
             authService.logout.mockResolvedValue(undefined);
             const result = await controller.logout({ headers: { authorization: 'Bearer token' }, user: { id: 'u1' } } as never, 'rt');
-            expect(result.message).toBe('Logged out successfully');
+            expect(result.message).toBe('Sesión cerrada correctamente');
             expect(authService.logout).toHaveBeenCalledWith('rt', 'token');
         });
     });

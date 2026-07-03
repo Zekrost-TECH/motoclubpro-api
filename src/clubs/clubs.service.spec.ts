@@ -2,6 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ClubsService } from './clubs.service';
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from '../users/users.service';
+import { MailService } from '../notifications/mail.service';
+import { RideRolesService } from '../ride-roles/ride-roles.service';
+import { PlansService } from '../plans/plans.service';
 
 describe('ClubsService', () => {
     let service: ClubsService;
@@ -23,6 +26,9 @@ describe('ClubsService', () => {
                 ClubsService,
                 { provide: DatabaseService, useValue: db },
                 { provide: UsersService, useValue: { findByEmail: jest.fn() } },
+                { provide: MailService, useValue: { sendInvitation: jest.fn().mockResolvedValue(true) } },
+                { provide: RideRolesService, useValue: { seedDefaults: jest.fn().mockResolvedValue(undefined) } },
+                { provide: PlansService, useValue: { assertCanAddMember: jest.fn().mockResolvedValue(undefined) } },
             ],
         }).compile();
 

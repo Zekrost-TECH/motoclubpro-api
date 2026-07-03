@@ -33,14 +33,14 @@ describe('RolesGuard', () => {
     });
 
     it('should allow if user has required role', () => {
-        reflector.getAllAndOverride.mockReturnValue([UserRole.admin, UserRole.lider]);
-        const result = guard.canActivate(createContext({ role: UserRole.lider }));
+        reflector.getAllAndOverride.mockReturnValue([UserRole.admin, UserRole.leader]);
+        const result = guard.canActivate(createContext({ role: UserRole.leader }));
         expect(result).toBe(true);
     });
 
     it('should deny if user lacks required role', () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.admin]);
-        const result = guard.canActivate(createContext({ role: UserRole.piloto }));
+        const result = guard.canActivate(createContext({ role: UserRole.rider }));
         expect(result).toBe(false);
     });
 });

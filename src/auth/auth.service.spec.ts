@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
+import { DatabaseService } from '../database/database.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
@@ -22,7 +23,7 @@ describe('AuthService', () => {
         name: 'Test',
         nickname: 'test',
         email: 'test@test.com',
-        role: UserRole.piloto,
+        role: UserRole.rider,
         riderLevel: 'novato',
         passwordHash: 'hashed',
         joinDate: new Date(),
@@ -33,7 +34,7 @@ describe('AuthService', () => {
         usersService = {
             findByEmail: jest.fn(),
             findOne: jest.fn(),
-            getUserClubs: jest.fn().mockResolvedValue([{ club_id: 'club-1', role: UserRole.piloto }]),
+            getUserClubs: jest.fn().mockResolvedValue([{ club_id: 'club-1', role: UserRole.rider }]),
         } as unknown as jest.Mocked<UsersService>;
 
         jwtService = {
@@ -54,6 +55,8 @@ describe('AuthService', () => {
             set: jest.fn().mockResolvedValue('OK'),
         };
 
+        const db = { query: jest.fn() };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 AuthService,
@@ -61,6 +64,7 @@ describe('AuthService', () => {
                 { provide: JwtService, useValue: jwtService },
                 { provide: ConfigService, useValue: configService },
                 { provide: 'REDIS_CLIENT', useValue: redis },
+                { provide: DatabaseService, useValue: db },
             ],
         }).compile();
 
@@ -92,7 +96,7 @@ describe('AuthService', () => {
             const result = await service.login(user as never);
             expect(result.access_token).toBe('signed-token');
             expect(result.refresh_token).toBe('signed-token');
-            expect(result.user.clubs).toEqual([{ club_id: 'club-1', role: UserRole.piloto }]);
+            expect(result.user.clubs).toEqual([{ club_id: 'club-1', role: UserRole.rider }]);
         });
     });
 

@@ -23,7 +23,7 @@ describe('ClubMemberGuard', () => {
         return {
             switchToHttp: () => ({
                 getRequest: () => ({
-                    user: { id: userId, role: UserRole.piloto },
+                    user: { id: userId, role: UserRole.rider },
                     params: { id: clubId },
                 }),
             }),

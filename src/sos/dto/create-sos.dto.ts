@@ -1,14 +1,6 @@
 import { IsEnum, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-export enum AlertType {
-    PINCHAZO = 'pinchazo',
-    SIN_GASOLINA = 'sin_gasolina',
-    FALLA_MECANICA = 'falla_mecanica',
-    ACCIDENTE = 'accidente',
-    MEDICA = 'medica',
-    OTRO = 'otro',
-}
+import { AlertType } from '../sos.types';
 
 export class CreateSosDto {
     @ApiProperty({ description: 'Alert type', enum: AlertType })

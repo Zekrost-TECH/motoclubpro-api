@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventsService, type EventRow } from './events.service';
 import { DatabaseService } from '../database/database.service';
+import { RideRolesService } from '../ride-roles/ride-roles.service';
+import { PlansService } from '../plans/plans.service';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 
 describe('EventsService', () => {
@@ -52,6 +54,20 @@ describe('EventsService', () => {
                         del: jest.fn().mockResolvedValue(1),
                         get: jest.fn().mockResolvedValue(null),
                         sismember: jest.fn().mockResolvedValue(0),
+                    },
+                },
+                {
+                    provide: RideRolesService,
+                    useValue: {
+                        findByClub: jest.fn().mockResolvedValue([]),
+                        findBySlug: jest.fn().mockResolvedValue({ slug: 'rider', name: 'Piloto', is_unique: false }),
+                        seedDefaults: jest.fn().mockResolvedValue(undefined),
+                    },
+                },
+                {
+                    provide: PlansService,
+                    useValue: {
+                        assertCanCreateEvent: jest.fn().mockResolvedValue(undefined),
                     },
                 },
             ],

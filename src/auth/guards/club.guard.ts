@@ -21,7 +21,7 @@ export class ClubGuard implements CanActivate {
       return false;
     }
 
-    if (user.role === UserRole.admin) {
+    if (user.role === UserRole.admin || user.role === UserRole.superadmin) {
       return true;
     }
 

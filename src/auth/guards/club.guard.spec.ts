@@ -30,13 +30,13 @@ describe('ClubGuard', () => {
     });
 
     it('should allow if no clubId header', () => {
-        const result = guard.canActivate(createContext({ role: UserRole.piloto, clubs: [] }));
+        const result = guard.canActivate(createContext({ role: UserRole.rider, clubs: [] }));
         expect(result).toBe(true);
     });
 
     it('should allow active member', () => {
         const result = guard.canActivate(
-            createContext({ role: UserRole.piloto, clubs: [{ club_id: 'club-1', role: UserRole.piloto }] }, 'club-1'),
+            createContext({ role: UserRole.rider, clubs: [{ club_id: 'club-1', role: UserRole.rider }] }, 'club-1'),
         );
         expect(result).toBe(true);
     });
@@ -44,7 +44,7 @@ describe('ClubGuard', () => {
     it('should throw ForbiddenException if not a member', () => {
         expect(() =>
             guard.canActivate(
-                createContext({ role: UserRole.piloto, clubs: [{ club_id: 'club-2', role: UserRole.piloto }] }, 'club-1'),
+                createContext({ role: UserRole.rider, clubs: [{ club_id: 'club-2', role: UserRole.rider }] }, 'club-1'),
             ),
         ).toThrow(ForbiddenException);
     });

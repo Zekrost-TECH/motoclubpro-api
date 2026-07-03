@@ -1,7 +1,8 @@
 export enum UserRole {
+    superadmin = 'superadmin',
     admin = 'admin',
-    lider = 'lider',
-    piloto = 'piloto'
+    leader = 'leader',
+    rider = 'rider'
 }
 
 export interface UserClub {

@@ -87,7 +87,7 @@ describe('EventsController', () => {
             const req = { user: { id: 'user-1', role: 'admin' } } as any;
             const result = await controller.create(dto, req, 'club-1');
             expect(result.id).toBe('event-1');
-            expect(serviceMock.create).toHaveBeenCalledWith(dto, 'user-1', 'club-1');
+            expect(serviceMock.create).toHaveBeenCalledWith(dto, 'user-1', 'club-1', 'admin');
         });
     });
 

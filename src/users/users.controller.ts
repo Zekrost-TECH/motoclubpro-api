@@ -39,7 +39,7 @@ export class UsersController {
     }
 
     @Get()
-    @Roles(UserRole.admin, UserRole.lider, UserRole.piloto)
+    @Roles(UserRole.admin, UserRole.leader, UserRole.rider)
     findAll(@CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: User[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
         return this.usersService.findAll(clubId, pagination?.page, pagination?.limit);
     }

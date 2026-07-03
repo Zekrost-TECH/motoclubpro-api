@@ -3,29 +3,7 @@ import { DatabaseService } from '../database/database.service';
 import { Redis } from 'ioredis';
 import { CreateSosDto } from './dto/create-sos.dto';
 import { FcmService } from '../notifications/fcm.service';
-
-export interface SosAlertRow {
-    id: string;
-    user_id: string;
-    user_name?: string;
-    event_id?: string;
-    club_id?: string;
-    type: string;
-    status: string;
-    description?: string;
-    resolved_by?: string;
-    created_at: string;
-    resolved_at?: string;
-    lat: number;
-    lng: number;
-}
-
-export interface SosAlertSummary {
-    id: string;
-    type: string;
-    status: string;
-    created_at: string;
-}
+import { SosAlertRow, SosAlertSummary, AlertStatus } from './sos.types';
 
 @Injectable()
 export class SosService {

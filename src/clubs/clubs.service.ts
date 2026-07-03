@@ -1,9 +1,12 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../notifications/mail.service';
+import { RideRolesService } from '../ride-roles/ride-roles.service';
+import { PlansService } from '../plans/plans.service';
+import { UserRole } from '../users/users.types';
 import type { AuthUser } from '../auth/auth.types';
 
 export interface ClubRow {
@@ -57,6 +60,8 @@ export class ClubsService {
     private readonly db: DatabaseService,
     private readonly usersService: UsersService,
     private readonly mailService: MailService,
+    private readonly rideRolesService: RideRolesService,
+    private readonly plansService: PlansService,
   ) { }
 
   async create(data: {
@@ -105,6 +110,7 @@ export class ClubsService {
       }
 
       await client.query('COMMIT');
+      await this.rideRolesService.seedDefaults(club.id);
       return club;
     } catch (err) {
       await client.query('ROLLBACK').catch(() => { });
@@ -124,6 +130,18 @@ export class ClubsService {
       [slug],
     );
     return rows[0] ?? null;
+  }
+
+  async findAll(): Promise<ClubRow[]> {
+    const { rows } = await this.db.query<ClubRow>(
+      `SELECT id, name, slug, logo_url, city, department, description, nit,
+              billing_address, billing_phone, billing_contact_name,
+              billing_contact_email, tax_regime, is_active, created_at
+       FROM clubs
+       WHERE is_active = TRUE
+       ORDER BY created_at DESC`,
+    );
+    return rows;
   }
 
   async findMembers(clubId: string, page = 1, limit = 20): Promise<{ data: MemberRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
@@ -164,7 +182,7 @@ export class ClubsService {
 
         const { rows } = await this.db.query<{ id: string }>(
           `INSERT INTO users (id, name, email, role, rider_level, password_hash, join_date, is_active)
-           VALUES (gen_random_uuid(), $1, $2, 'piloto', 'novato', $3, NOW(), true)
+           VALUES (gen_random_uuid(), $1, $2, 'rider', 'novato', $3, NOW(), true)
            RETURNING id`,
           [nameFromEmail, email, hashedPassword],
         );
@@ -175,23 +193,40 @@ export class ClubsService {
           [clubId],
         );
         const clubName = clubRows[0]?.name || 'tu club';
-        const loginUrl = process.env.WEB_URL || 'http://localhost:5173/login';
 
         await this.mailService.sendInvitation({
           email,
           clubName,
           inviterName: invitedBy?.email || 'Un administrador',
           tempPassword,
-          loginUrl,
-        }).catch((err) => {
-          this.logger.warn(`Failed to send invitation email to ${email}: ${err.message}`);
+        }).catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to send invitation email to ${email}: ${message}`);
         });
       }
     }
 
     if (!targetUserId) {
-      throw new BadRequestException('userId or email is required');
+      throw new BadRequestException('Debes proporcionar userId o email para invitar al miembro');
     }
+
+    await this.plansService.assertCanAddMember(clubId, invitedBy?.role);
+
+    if (role === 'admin' || role === 'leader') {
+      const limits = await this.plansService.getClubLimits(clubId);
+      if (limits && !limits.features.multiple_admins && !limits.features.unlimited) {
+        const { rows: adminRows } = await this.db.query<{ count: number }>(
+          `SELECT COUNT(*)::int as count FROM club_members WHERE club_id = $1 AND role IN ($2, $3) AND is_active = TRUE`,
+          [clubId, UserRole.admin, UserRole.leader],
+        );
+        if ((adminRows[0]?.count ?? 0) >= 1) {
+          throw new ForbiddenException(
+            `Tu plan ${limits.planName} solo permite un administrador o líder por club. Actualiza tu plan para agregar más.`
+          );
+        }
+      }
+    }
+
     await this.db.query(
       `INSERT INTO club_members (club_id, user_id, role)
        VALUES ($1, $2, $3)
@@ -202,9 +237,10 @@ export class ClubsService {
   }
 
   async joinClub(clubId: string, userId: string): Promise<void> {
+    await this.plansService.assertCanAddMember(clubId);
     await this.db.query(
       `INSERT INTO club_members (club_id, user_id, role)
-       VALUES ($1, $2, 'piloto')
+       VALUES ($1, $2, 'rider')
        ON CONFLICT (club_id, user_id) DO UPDATE
        SET is_active = TRUE`,
       [clubId, userId],

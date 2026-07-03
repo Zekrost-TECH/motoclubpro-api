@@ -31,20 +31,20 @@ describe('ClubRolesGuard', () => {
     });
 
     it('should throw if no user or clubId', () => {
-        reflector.getAllAndOverride.mockReturnValue([UserRole.lider]);
+        reflector.getAllAndOverride.mockReturnValue([UserRole.leader]);
         expect(() => guard.canActivate(createContext())).toThrow(ForbiddenException);
     });
 
     it('should allow admin regardless of club role', () => {
-        reflector.getAllAndOverride.mockReturnValue([UserRole.lider]);
+        reflector.getAllAndOverride.mockReturnValue([UserRole.leader]);
         const result = guard.canActivate(createContext({ role: UserRole.admin }, 'club-1'));
         expect(result).toBe(true);
     });
 
     it('should allow if user has required role in club', () => {
-        reflector.getAllAndOverride.mockReturnValue([UserRole.lider]);
+        reflector.getAllAndOverride.mockReturnValue([UserRole.leader]);
         const result = guard.canActivate(
-            createContext({ role: UserRole.piloto, clubs: [{ club_id: 'club-1', role: UserRole.lider }] }, 'club-1'),
+            createContext({ role: UserRole.rider, clubs: [{ club_id: 'club-1', role: UserRole.leader }] }, 'club-1'),
         );
         expect(result).toBe(true);
     });
@@ -53,7 +53,7 @@ describe('ClubRolesGuard', () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.admin]);
         expect(() =>
             guard.canActivate(
-                createContext({ role: UserRole.piloto, clubs: [{ club_id: 'club-1', role: UserRole.lider }] }, 'club-1'),
+                createContext({ role: UserRole.rider, clubs: [{ club_id: 'club-1', role: UserRole.leader }] }, 'club-1'),
             ),
         ).toThrow(ForbiddenException);
     });

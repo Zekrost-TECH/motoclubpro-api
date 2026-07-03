@@ -61,5 +61,3 @@ output*
 test-api*
 test-phase*
 gen_hash.js
-infra/init.sql
-src/infra/

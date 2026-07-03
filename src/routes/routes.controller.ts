@@ -21,7 +21,7 @@ export class RoutesController {
     constructor(private readonly routesService: RoutesService) { }
 
     @Post()
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     create(@Request() req: AuthRequest, @Body() createRouteDto: CreateRouteDto, @CurrentClub() clubId?: string): Promise<Route> {
         return this.routesService.create(req.user.id, createRouteDto, clubId);
     }
@@ -37,7 +37,7 @@ export class RoutesController {
     }
 
     @Patch(':id')
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     update(@Param('id') id: string, @Body() updateRouteDto: UpdateRouteDto, @CurrentClub() clubId?: string): Promise<Route> {
         return this.routesService.update(id, updateRouteDto, clubId);
     }

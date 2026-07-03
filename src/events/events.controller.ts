@@ -51,9 +51,9 @@ export class EventsController {
     }
 
     @Post()
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     create(@Body() createEventDto: CreateEventDto, @Request() req: AuthRequest, @CurrentClub() clubId?: string): Promise<EventRow> {
-        return this.eventsService.create(createEventDto, req.user.id, clubId);
+        return this.eventsService.create(createEventDto, req.user.id, clubId, req.user.role);
     }
 
     @Patch(':id')
@@ -63,7 +63,7 @@ export class EventsController {
     }
 
     @Patch(':id/status')
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     updateStatus(@Param('id') id: string, @Body() updateEventStatusDto: UpdateEventStatusDto, @CurrentClub() clubId?: string): Promise<EventRow> {
         return this.eventsService.updateStatus(id, updateEventStatusDto.status, clubId);
     }
@@ -113,7 +113,7 @@ export class EventsController {
     }
 
     @Post(':id/checklist')
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     addChecklistItem(
         @Param('id') id: string,
         @Body() dto: CreateChecklistItemDto,
@@ -123,7 +123,7 @@ export class EventsController {
     }
 
     @Delete(':id/checklist/:itemId')
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     removeChecklistItem(
         @Param('id') id: string,
         @Param('itemId') itemId: string,
@@ -155,7 +155,7 @@ export class EventsController {
     }
 
     @Post(':id/inventory')
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     addInventoryItem(@Param('id') id: string, @Body() createInventoryItemDto: CreateInventoryItemDto, @CurrentClub() clubId?: string): Promise<InventoryRow> {
         return this.eventsService.addInventoryItem(id, createInventoryItemDto, clubId);
     }
@@ -171,7 +171,7 @@ export class EventsController {
     }
 
     @Delete(':id/inventory/:itemId')
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     removeInventoryItem(@Param('id') id: string, @Param('itemId') itemId: string, @CurrentClub() clubId?: string): Promise<{ deleted: boolean }> {
         return this.eventsService.removeInventoryItem(id, itemId, clubId);
     }

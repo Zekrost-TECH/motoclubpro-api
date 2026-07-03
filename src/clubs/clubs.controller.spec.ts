@@ -11,7 +11,7 @@ describe('ClubsController', () => {
     let service: ClubsService;
 
     const mockClub = { id: 'club-1', name: 'Test Club', slug: 'test-club', city: 'Bogota', department: 'Cundinamarca', logo_url: null, nit: null, billing_address: null, billing_phone: null, billing_contact_name: null, billing_contact_email: null, tax_regime: null, is_active: true, created_at: new Date() };
-    const mockMember = { id: 'member-1', user_id: 'user-1', club_id: 'club-1', role: 'piloto', joined_at: new Date(), is_active: true, name: 'Test User', email: 'test@test.com', avatar_url: null };
+    const mockMember = { id: 'member-1', user_id: 'user-1', club_id: 'club-1', role: 'rider', joined_at: new Date(), is_active: true, name: 'Test User', email: 'test@test.com', avatar_url: null };
     const mockSubscription = { id: 'sub-1', club_id: 'club-1', plan: 'basic', status: 'active', current_period_start: new Date(), current_period_end: new Date(), created_at: new Date() };
 
     beforeEach(async () => {
@@ -76,19 +76,19 @@ describe('ClubsController', () => {
 
     describe('inviteMember', () => {
         it('should invite a member by userId', async () => {
-            const dto = { userId: 'user-2', role: 'piloto' };
+            const dto = { userId: 'user-2', role: 'rider' };
             const req = { user: { id: 'admin-1', email: 'admin@test.com' } } as any;
             const result = await controller.inviteMember('club-1', dto, req);
             expect(result).toEqual({ ok: true });
-            expect(service.inviteMember).toHaveBeenCalledWith('club-1', 'user-2', undefined, 'piloto', req.user);
+            expect(service.inviteMember).toHaveBeenCalledWith('club-1', 'user-2', undefined, 'rider', req.user);
         });
 
         it('should invite a member by email creating a new account', async () => {
-            const dto = { email: 'new@user.com', role: 'piloto' };
+            const dto = { email: 'new@user.com', role: 'rider' };
             const req = { user: { id: 'admin-1', email: 'admin@test.com' } } as any;
             const result = await controller.inviteMember('club-1', dto, req);
             expect(result).toEqual({ ok: true });
-            expect(service.inviteMember).toHaveBeenCalledWith('club-1', undefined, 'new@user.com', 'piloto', req.user);
+            expect(service.inviteMember).toHaveBeenCalledWith('club-1', undefined, 'new@user.com', 'rider', req.user);
         });
     });
 

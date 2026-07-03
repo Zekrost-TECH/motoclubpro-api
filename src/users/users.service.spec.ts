@@ -30,7 +30,7 @@ describe('UsersService', () => {
             db.query.mockResolvedValueOnce({
                 rows: [{
                     id: 'u1', name: 'Test', nickname: 't', email: 't@test.com',
-                    role: UserRole.piloto, riderLevel: 'novato', joinDate: new Date(), isActive: true,
+                    role: UserRole.rider, riderLevel: 'novato', joinDate: new Date(), isActive: true,
                 }],
             });
 
@@ -51,7 +51,7 @@ describe('UsersService', () => {
         it('should return all active users when no clubId', async () => {
             db.query
                 .mockResolvedValueOnce({ rows: [{ count: 1 }] })
-                .mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'A', role: UserRole.piloto }] });
+                .mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'A', role: UserRole.rider }] });
             const result = await service.findAll();
             expect(result.data).toHaveLength(1);
             expect(result.meta.total).toBe(1);
@@ -60,7 +60,7 @@ describe('UsersService', () => {
         it('should filter by clubId when provided', async () => {
             db.query
                 .mockResolvedValueOnce({ rows: [{ count: 1 }] })
-                .mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'A', role: UserRole.piloto }] });
+                .mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'A', role: UserRole.rider }] });
             const result = await service.findAll('club-1');
             expect(result.data).toHaveLength(1);
             expect(result.meta.total).toBe(1);
@@ -157,6 +157,7 @@ describe('UsersService', () => {
 
     describe('getUserClubs', () => {
         it('should return clubs the user belongs to', async () => {
+            db.query.mockResolvedValueOnce({ rows: [{ role: UserRole.admin }] });
             db.query.mockResolvedValueOnce({ rows: [{ club_id: 'club-1', role: UserRole.admin }] });
             const result = await service.getUserClubs('u1');
             expect(result).toHaveLength(1);

@@ -21,7 +21,7 @@ export class AuthController {
     @HttpCode(200)
     async login(@Body() body: LoginDto): Promise<AuthResponse> {
         const user = await this.authService.validateUser(body.email, body.password);
-        if (!user) throw new UnauthorizedException('Invalid credentials');
+        if (!user) throw new UnauthorizedException('Credenciales inválidas');
         return this.authService.login(user);
     }
 
@@ -36,7 +36,7 @@ export class AuthController {
     @Post('refresh')
     @HttpCode(200)
     async refresh(@Body('refresh_token') refreshToken: string): Promise<Pick<AuthResponse, 'access_token' | 'refresh_token'>> {
-        if (!refreshToken) throw new UnauthorizedException('Refresh token is missing');
+        if (!refreshToken) throw new UnauthorizedException('El refresh token es obligatorio');
         return this.authService.refresh(refreshToken);
     }
 
@@ -48,7 +48,7 @@ export class AuthController {
         const accessToken = authHeader?.split(' ')[1];
 
         await this.authService.logout(refreshToken, accessToken);
-        return { message: 'Logged out successfully' };
+        return { message: 'Sesión cerrada correctamente' };
     }
 
     @Get('me')
@@ -59,7 +59,7 @@ export class AuthController {
 
     @Get('clubs')
     @UseGuards(JwtAuthGuard)
-    async clubs(@Request() req: AuthRequest): Promise<{ clubs: { club_id: string; role: string; name: string; slug: string; description: string | null; logo_url: string | null; city: string | null; department: string | null }[]; activeClubId: string | null }> {
+    async clubs(@Request() req: AuthRequest): Promise<{ clubs: { club_id: string; role: string; name: string; slug: string; description: string | null; logo_url: string | null; city: string | null; department: string | null; features: Record<string, boolean> }[]; activeClubId: string | null }> {
         return { clubs: await this.authService.getUserClubs(req.user.id), activeClubId: null };
     }
 
@@ -67,7 +67,7 @@ export class AuthController {
     @UseGuards(JwtAuthGuard)
     @HttpCode(200)
     async switchClub(@Request() req: AuthRequest, @Body('club_id') clubId: string): Promise<{ access_token: string; refresh_token: string }> {
-        if (!clubId) throw new ForbiddenException('club_id is required');
+        if (!clubId) throw new ForbiddenException('El campo club_id es obligatorio');
         return this.authService.switchClub(req.user.id, clubId);
     }
 }

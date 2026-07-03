@@ -1,20 +1,10 @@
-import { IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import type { RideRole } from '../events.types';
 
 export class UpdateAttendeeRoleDto {
-  @ApiProperty({ description: 'Ride role assigned to attendee', enum: ['puntero', 'barredora', 'capitan_ruta', 'bloqueador', 'cierre_seguridad', 'jefe_armas', 'primeros_auxilios', 'coordinador_logistico', 'comunicador', 'rider'] })
-  @IsEnum([
-    'puntero',
-    'barredora',
-    'capitan_ruta',
-    'bloqueador',
-    'cierre_seguridad',
-    'jefe_armas',
-    'primeros_auxilios',
-    'coordinador_logistico',
-    'comunicador',
-    'rider',
-  ])
+  @ApiProperty({ description: 'Ride role slug (must exist in the club ride roles)' })
+  @IsString()
+  @IsNotEmpty()
   ride_role!: RideRole;
 }

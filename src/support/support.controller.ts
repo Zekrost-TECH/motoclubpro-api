@@ -47,13 +47,13 @@ export class SupportController {
     }
 
     @Patch(':id')
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     async update(@Param('id') id: string, @Body() updateSupportDto: UpdateSupportDto, @CurrentClub() clubId?: string): Promise<SupportPointSummary> {
         return await this.supportService.update(id, updateSupportDto, clubId);
     }
 
     @Patch(':id/verify')
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     async verify(@Param('id') id: string, @Body() body: { verified: boolean }, @CurrentClub() clubId?: string): Promise<SupportPointVerify> {
         return await this.supportService.verify(id, body.verified, clubId);
     }

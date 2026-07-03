@@ -17,9 +17,11 @@ import { CreateClubDto } from './dto/create-club.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { ClubMemberGuard } from './guards/club-member.guard';
 import { ClubMemberRolesGuard } from './guards/club-member-roles.guard';
 import { ClubRoles } from '../auth/decorators/club-role.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/users.types';
 import type { AuthRequest } from '../auth/auth.types';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -58,10 +60,17 @@ export class ClubsController {
 
   @Post(':id/members')
   @UseGuards(ClubMemberGuard, ClubMemberRolesGuard)
-  @ClubRoles(UserRole.admin, UserRole.lider)
+  @ClubRoles(UserRole.admin, UserRole.leader)
   async inviteMember(@Param('id') clubId: string, @Body() dto: InviteMemberDto, @Request() req: AuthRequest): Promise<{ ok: boolean }> {
-    await this.clubsService.inviteMember(clubId, dto.userId, dto.email, dto.role || 'piloto', req.user);
+    await this.clubsService.inviteMember(clubId, dto.userId, dto.email, dto.role || 'rider', req.user);
     return { ok: true };
+  }
+
+  @Get()
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.superadmin)
+  async findAll(): Promise<ClubRow[]> {
+    return this.clubsService.findAll();
   }
 
   @Post(':id/join')
@@ -72,7 +81,7 @@ export class ClubsController {
 
   @Patch(':id')
   @UseGuards(ClubMemberGuard, ClubMemberRolesGuard)
-  @ClubRoles(UserRole.admin, UserRole.lider)
+  @ClubRoles(UserRole.admin, UserRole.leader)
   async updateClub(@Param('id') clubId: string, @Body() dto: { name?: string; city?: string; department?: string; description?: string }): Promise<ClubRow> {
     return this.clubsService.update(clubId, dto);
   }

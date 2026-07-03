@@ -35,25 +35,25 @@ describe('OwnerGuard', () => {
     });
 
     it('should throw ForbiddenException when motorcycleId is missing', async () => {
-        const context = createContext({ id: 'u1', role: UserRole.piloto }, '') as never;
+        const context = createContext({ id: 'u1', role: UserRole.rider }, '') as never;
         await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw NotFoundException when motorcycle does not exist', async () => {
         db.query.mockResolvedValue({ rows: [] });
-        const context = createContext({ id: 'u1', role: UserRole.piloto }, 'm1') as never;
+        const context = createContext({ id: 'u1', role: UserRole.rider }, 'm1') as never;
         await expect(guard.canActivate(context)).rejects.toThrow(NotFoundException);
     });
 
     it('should allow when user is the owner', async () => {
         db.query.mockResolvedValue({ rows: [{ user_id: 'u1' }] });
-        const context = createContext({ id: 'u1', role: UserRole.piloto }, 'm1') as never;
+        const context = createContext({ id: 'u1', role: UserRole.rider }, 'm1') as never;
         await expect(guard.canActivate(context)).resolves.toBe(true);
     });
 
     it('should deny when user is not the owner', async () => {
         db.query.mockResolvedValue({ rows: [{ user_id: 'u2' }] });
-        const context = createContext({ id: 'u1', role: UserRole.piloto }, 'm1') as never;
+        const context = createContext({ id: 'u1', role: UserRole.rider }, 'm1') as never;
         await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
     });
 });

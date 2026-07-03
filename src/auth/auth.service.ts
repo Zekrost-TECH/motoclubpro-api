@@ -129,7 +129,36 @@ export class AuthService {
         }
     }
 
-    async getUserClubs(userId: string): Promise<{ club_id: string; role: UserRole; name: string; slug: string; description: string | null; logo_url: string | null; city: string | null; department: string | null }[]> {
+    async getUserClubs(userId: string): Promise<{ club_id: string; role: UserRole; name: string; slug: string; description: string | null; logo_url: string | null; city: string | null; department: string | null; features: Record<string, boolean> }[]> {
+        const userRows = await this.db.query<{ role: UserRole }>(
+            `SELECT role FROM users WHERE id = $1`,
+            [userId],
+        );
+        const userRole = userRows.rows[0]?.role;
+
+        if (userRole === UserRole.superadmin) {
+            const { rows } = await this.db.query<{
+                club_id: string;
+                role: UserRole;
+                name: string;
+                slug: string;
+                description: string | null;
+                logo_url: string | null;
+                city: string | null;
+                department: string | null;
+                features: Record<string, boolean>;
+            }>(
+                `SELECT c.id as club_id, $1::user_role as role, c.name, c.slug, c.description, c.logo_url, c.city, c.department, p.features
+                 FROM clubs c
+                 LEFT JOIN club_subscriptions cs ON cs.club_id = c.id AND cs.status IN ('active', 'trial')
+                 LEFT JOIN plans p ON p.id = cs.plan_id
+                 WHERE c.is_active = TRUE
+                 ORDER BY c.created_at DESC`,
+                [UserRole.superadmin],
+            );
+            return rows;
+        }
+
         const { rows } = await this.db.query<{
             club_id: string;
             role: UserRole;
@@ -139,10 +168,13 @@ export class AuthService {
             logo_url: string | null;
             city: string | null;
             department: string | null;
+            features: Record<string, boolean>;
         }>(
-            `SELECT c.id as club_id, cm.role, c.name, c.slug, c.description, c.logo_url, c.city, c.department
+            `SELECT c.id as club_id, cm.role, c.name, c.slug, c.description, c.logo_url, c.city, c.department, p.features
              FROM club_members cm
              JOIN clubs c ON c.id = cm.club_id
+             LEFT JOIN club_subscriptions cs ON cs.club_id = c.id AND cs.status IN ('active', 'trial')
+             LEFT JOIN plans p ON p.id = cs.plan_id
              WHERE cm.user_id = $1 AND cm.is_active = TRUE AND c.is_active = TRUE
              ORDER BY cm.joined_at DESC`,
             [userId],
@@ -151,22 +183,27 @@ export class AuthService {
     }
 
     async switchClub(userId: string, clubId: string): Promise<{ access_token: string; refresh_token: string }> {
-        // Verify active membership
-        const { rows } = await this.db.query<{ role: UserRole }>(
-            `SELECT role FROM club_members WHERE club_id = $1 AND user_id = $2 AND is_active = TRUE`,
-            [clubId, userId],
-        );
-        if (rows.length === 0) {
-            throw new UnauthorizedException('No eres miembro activo de este club');
-        }
-
-        const clubs = await this.usersService.getUserClubs(userId);
         const user = await this.usersService.findOne(userId);
         if (!user) {
             throw new UnauthorizedException('Usuario no encontrado');
         }
 
-        const payload = { sub: user.id, email: user.email, role: rows[0].role, clubs };
+        let activeRole: UserRole = user.role;
+        if (user.role !== UserRole.superadmin) {
+            // Verify active membership
+            const { rows } = await this.db.query<{ role: UserRole }>(
+                `SELECT role FROM club_members WHERE club_id = $1 AND user_id = $2 AND is_active = TRUE`,
+                [clubId, userId],
+            );
+            if (rows.length === 0) {
+                throw new UnauthorizedException('No eres miembro activo de este club');
+            }
+            activeRole = rows[0].role;
+        }
+
+        const clubs = await this.getUserClubs(userId);
+
+        const payload = { sub: user.id, email: user.email, role: activeRole, clubs };
         const refreshSecret = this.configService.get<string>('REFRESH_SECRET');
         const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '30d';
 

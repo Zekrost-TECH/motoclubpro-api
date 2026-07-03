@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Patch, Body, Param, UseGuards, Req, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
-import { SosService, type SosAlertRow, type SosAlertSummary } from './sos.service';
+import { SosService } from './sos.service';
+import { type SosAlertRow, type SosAlertSummary } from './sos.types';
 import { CreateSosDto } from './dto/create-sos.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
@@ -37,7 +38,7 @@ export class SosController {
     }
 
     @Patch(':id/resolve')
-    @ClubRoles(UserRole.admin, UserRole.lider)
+    @ClubRoles(UserRole.admin, UserRole.leader)
     async resolve(@Param('id') id: string, @Req() req: AuthRequest, @CurrentClub() clubId?: string): Promise<SosAlertSummary> {
         const userId = req.user.id;
         return await this.sosService.resolve(id, userId, clubId);

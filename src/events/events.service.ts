@@ -12,6 +12,9 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { RideRole } from './events.types';
+import { RideRolesService } from '../ride-roles/ride-roles.service';
+import { PlansService } from '../plans/plans.service';
+import { UserRole } from '../users/users.types';
 
 export interface EventRow {
     id: string;
@@ -78,6 +81,8 @@ export class EventsService {
     constructor(
         private readonly db: DatabaseService,
         @Inject('REDIS_CLIENT') private readonly redis: Redis,
+        private readonly rideRolesService: RideRolesService,
+        private readonly plansService: PlansService,
     ) { }
 
     // ── Contrato Redis de autorización del tracker ─────────────────────────────
@@ -100,7 +105,11 @@ export class EventsService {
         }
     }
 
-    async create(createEventDto: CreateEventDto, userId: string, clubId?: string): Promise<EventRow> {
+    async create(createEventDto: CreateEventDto, userId: string, clubId?: string, userRole?: UserRole): Promise<EventRow> {
+        if (clubId) {
+            await this.plansService.assertCanCreateEvent(clubId, userRole);
+        }
+
         const {
             title,
             description,
@@ -291,8 +300,8 @@ export class EventsService {
         const userRole = user.role;
         let rideRole = requestedRideRole || 'rider';
 
-        // Solo admin o lider pueden elegir un rol distinto a rider
-        if (rideRole !== 'rider' && userRole !== 'admin' && userRole !== 'lider') {
+        // Solo admin o leader pueden elegir un rol distinto a rider
+        if (rideRole !== 'rider' && userRole !== 'admin' && userRole !== 'leader') {
             rideRole = 'rider';
         }
 
@@ -338,6 +347,21 @@ export class EventsService {
             throw new BadRequestException('No active motorcycle with valid SOAT and Tech Review found for the user');
         }
 
+        // Validate role exists in the club and respect unique roles
+        const clubRideRole = await this.rideRolesService.findBySlug(event.club_id ?? '', rideRole);
+        if (!clubRideRole) {
+            throw new BadRequestException(`El rol de rodada "${rideRole}" no existe en este club`);
+        }
+        if (clubRideRole.is_unique) {
+            const existing = await this.db.query(
+                `SELECT 1 FROM event_attendees WHERE event_id = $1 AND ride_role = $2 LIMIT 1`,
+                [eventId, rideRole],
+            );
+            if (existing.rows.length > 0) {
+                throw new ConflictException(`Ya existe un ${clubRideRole.name} asignado para este evento`);
+            }
+        }
+
         // Insert RSVP
         try {
             await this.db.query(
@@ -347,7 +371,7 @@ export class EventsService {
             );
         } catch (e: unknown) {
             const err = e as { code?: string };
-            if (err.code === '23505') { // Unique violation
+            if (err.code === '23505') { // Unique violation (event_id, user_id)
                 throw new ConflictException('User is already RSVPd to this event');
             }
             throw e;
@@ -393,8 +417,12 @@ export class EventsService {
     }
 
     async updateAttendeeRole(eventId: string, targetUserId: string, role: RideRole, clubId?: string): Promise<AttendeeRow> {
-        await this.verifyEventClub(eventId, clubId);
-        // Basic unique checks for 'puntero' and 'barredora' are handled by PG unique indexes
+        const event = await this.findOne(eventId, clubId);
+        const clubRideRole = await this.rideRolesService.findBySlug(event.club_id ?? '', role);
+        if (!clubRideRole) {
+            throw new BadRequestException(`El rol de rodada "${role}" no existe en este club`);
+        }
+        // Basic unique checks for roles flagged as is_unique are handled by PG unique indexes
         try {
             const res = await this.db.query<AttendeeRow>(
                 `UPDATE event_attendees SET ride_role = $1 WHERE event_id = $2 AND user_id = $3 RETURNING *`,

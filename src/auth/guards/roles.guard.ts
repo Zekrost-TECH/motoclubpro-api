@@ -24,6 +24,10 @@ export class RolesGuard implements CanActivate {
             throw new UnauthorizedException();
         }
 
+        if (user.role === UserRole.superadmin) {
+            return true;
+        }
+
         return requiredRoles.includes(user.role);
     }
 }

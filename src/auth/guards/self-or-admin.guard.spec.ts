@@ -23,12 +23,12 @@ describe('SelfOrAdminGuard', () => {
     });
 
     it('should allow user to access their own data', () => {
-        const ctx = createContext({ id: 'user-1', role: UserRole.piloto }, 'user-1');
+        const ctx = createContext({ id: 'user-1', role: UserRole.rider }, 'user-1');
         expect(guard.canActivate(ctx)).toBe(true);
     });
 
     it('should throw ForbiddenException for non-admin accessing another user', () => {
-        const ctx = createContext({ id: 'user-1', role: UserRole.piloto }, 'user-2');
+        const ctx = createContext({ id: 'user-1', role: UserRole.rider }, 'user-2');
         expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
     });
 
