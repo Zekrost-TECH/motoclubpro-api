@@ -34,8 +34,9 @@ export class SosService {
 
         // Convención de canal EXPLÍCITA por tipo de destino:
         //   sos:event:{id} → entregado en tiempo real por el tracker (riders del evento)
-        //   sos:club:{id}  → club completo (FCM push + dashboard web)
+        //   sos:club:{id}  → club completo (dashboard web)
         //   sos:global     → fallback
+        // FCM push: si hay event_id, solo a asistentes de ese evento; si no, a todo el club.
         const channel = event_id
             ? `sos:event:${event_id}`
             : (clubId ? `sos:club:${clubId}` : 'sos:global');
@@ -43,7 +44,7 @@ export class SosService {
         void this.redisClient.publish(channel, wsPayload);
 
         // FCM push en background — no bloquea la respuesta al cliente
-        this._sendFcmAlert(userId, type, lat, lng, clubId).catch((err) => {
+        this._sendFcmAlert(userId, type, lat, lng, clubId, event_id || null).catch((err) => {
             Logger.error('[FCM] Error en push SOS', err instanceof Error ? err.stack : String(err), 'SosService');
         });
 
@@ -56,16 +57,25 @@ export class SosService {
         lat: number,
         lng: number,
         clubId?: string,
+        eventId?: string | null,
     ): Promise<void> {
         let tokenQuery = `SELECT fcm_token FROM users
                  WHERE fcm_token IS NOT NULL
                    AND is_active = true
                    AND id != $1`;
         const tokenParams: (string | null)[] = [excludeUserId];
+        let paramIndex = 2;
 
         if (clubId) {
-            tokenQuery += ` AND EXISTS (SELECT 1 FROM club_members cm WHERE cm.user_id = users.id AND cm.club_id = $2 AND cm.is_active = true)`;
+            tokenQuery += ` AND EXISTS (SELECT 1 FROM club_members cm WHERE cm.user_id = users.id AND cm.club_id = $${paramIndex} AND cm.is_active = true)`;
             tokenParams.push(clubId);
+            paramIndex++;
+        }
+
+        if (eventId) {
+            tokenQuery += ` AND EXISTS (SELECT 1 FROM event_attendees ea WHERE ea.user_id = users.id AND ea.event_id = $${paramIndex})`;
+            tokenParams.push(eventId);
+            paramIndex++;
         }
 
         const [userRow, tokenRows] = await Promise.all([
