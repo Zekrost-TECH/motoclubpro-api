@@ -34,4 +34,5 @@ export interface SosAlertSummary {
     type: AlertType;
     status: AlertStatus;
     created_at: string;
+    user_name?: string;
 }

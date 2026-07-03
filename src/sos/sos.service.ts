@@ -18,11 +18,20 @@ export class SosService {
         const { type, lat, lng, event_id, description } = data;
 
         // Insertar en BD con PostGIS — ST_MakePoint(lng, lat)
-        const { rows } = await this.rawDb.query<SosAlertSummary>(`
+        const insertResult = await this.rawDb.query<{ id: string }>(`
             INSERT INTO sos_alerts (user_id, event_id, club_id, type, location, status, description)
             VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, 'activa', $7)
-            RETURNING id, type, status, created_at
+            RETURNING id
         `, [userId, event_id || null, clubId || null, type, lng, lat, description || null]);
+
+        const alertId = insertResult.rows[0].id;
+
+        const { rows } = await this.rawDb.query<SosAlertSummary>(`
+            SELECT s.id, s.type, s.status, s.created_at, u.name as user_name
+            FROM sos_alerts s
+            LEFT JOIN users u ON u.id = s.user_id
+            WHERE s.id = $1
+        `, [alertId]);
 
         const alert = rows[0];
 
