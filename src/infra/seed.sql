@@ -194,7 +194,24 @@ INSERT INTO users (id, name, nickname, email, phone, avatar_initials, role, ride
     ('b0000000-0000-0000-0000-000000000012', 'Camilo Soto', 'Cami', 'cami@calithunder.co', '+57 320 111 0003', 'CS', 'rider', 'novato', pwd_hash, 'B+', NULL, NULL, 'Diana Soto', '+57 321 222 0003', 'Madre', 5, 900),
     ('b0000000-0000-0000-0000-000000000013', 'Diana Vargas', 'Diana', 'diana@calithunder.co', '+57 320 111 0004', 'DV', 'rider', 'intermedio', pwd_hash, 'AB+', NULL, NULL, 'Ernesto Vargas', '+57 321 222 0004', 'Hermano', 18, 3600),
     ('b0000000-0000-0000-0000-000000000014', 'Esteban Cárdenas', 'Este', 'este@calithunder.co', '+57 320 111 0005', 'EC', 'rider', 'avanzado', pwd_hash, 'A-', NULL, NULL, 'Fernanda Cárdenas', '+57 321 222 0005', 'Esposa', 22, 4800),
-    ('b0000000-0000-0000-0000-000000000015', 'Fernanda López', 'Fer', 'fer@calithunder.co', '+57 320 111 0006', 'FL', 'rider', 'basico', pwd_hash, 'O-', NULL, NULL, 'Gabriel López', '+57 321 222 0006', 'Padre', 10, 2000);
+    ('b0000000-0000-0000-0000-000000000015', 'Fernanda López', 'Fer', 'fer@calithunder.co', '+57 320 111 0006', 'FL', 'rider', 'basico', pwd_hash, 'O-', NULL, NULL, 'Gabriel López', '+57 321 222 0006', 'Padre', 10, 2000),
+    -- Miembros adicionales para evitar membresías cruzadas entre clubes
+    -- Medellín Riders
+    ('b0000000-0000-0000-0000-000000000016', 'Lucía Fernández', 'Luci', 'lucia@medellin-riders.co', '+57 320 111 0007', 'LF', 'admin', 'avanzado', pwd_hash, 'A+', NULL, NULL, 'Sofía Fernández', '+57 321 222 0007', 'Hermana', 20, 4100),
+    ('b0000000-0000-0000-0000-000000000017', 'Diego Ramírez', 'D-Ram', 'diego@medellin-riders.co', '+57 320 111 0008', 'DR', 'leader', 'experto', pwd_hash, 'O+', NULL, NULL, 'María Ramírez', '+57 321 222 0008', 'Esposa', 35, 7800),
+    ('b0000000-0000-0000-0000-000000000018', 'Elena Gómez', 'Elen', 'elena@medellin-riders.co', '+57 320 111 0009', 'EG', 'rider', 'intermedio', pwd_hash, 'B+', NULL, NULL, 'Jorge Gómez', '+57 321 222 0009', 'Padre', 15, 3100),
+    -- Bogotá Rebels
+    ('b0000000-0000-0000-0000-000000000019', 'Ricardo Mendoza', 'Rich', 'ricardo@bogota-rebels.co', '+57 320 111 0010', 'RM', 'admin', 'avanzado', pwd_hash, 'O-', NULL, NULL, 'Luisa Mendoza', '+57 321 222 0010', 'Esposa', 28, 6200),
+    ('b0000000-0000-0000-0000-000000000020', 'Natalia Silva', 'Nata', 'natalia@bogota-rebels.co', '+57 320 111 0011', 'NS', 'rider', 'basico', pwd_hash, 'A-', NULL, NULL, 'Diego Silva', '+57 321 222 0011', 'Hermano', 7, 1300),
+    -- Cali Thunder (completar 15 miembros del plan Prueba)
+    ('b0000000-0000-0000-0000-000000000021', 'Andrés Medina', 'Andres', 'andres@calithunder.co', '+57 320 111 0012', 'AM', 'rider', 'intermedio', pwd_hash, 'A+', NULL, NULL, 'Lina Medina', '+57 321 222 0012', 'Esposa', 11, 2300),
+    ('b0000000-0000-0000-0000-000000000022', 'Isabel Reyes', 'Isa', 'isabel@calithunder.co', '+57 320 111 0013', 'IR', 'rider', 'basico', pwd_hash, 'O+', NULL, NULL, 'Pedro Reyes', '+57 321 222 0013', 'Padre', 6, 1200),
+    ('b0000000-0000-0000-0000-000000000023', 'Martín Herrera', 'Marto', 'martin@calithunder.co', '+57 320 111 0014', 'MH', 'rider', 'avanzado', pwd_hash, 'B-', NULL, NULL, 'Ana Herrera', '+57 321 222 0014', 'Madre', 19, 3900),
+    ('b0000000-0000-0000-0000-000000000024', 'Luciana Castro', 'Luchi', 'luciana@calithunder.co', '+57 320 111 0015', 'LC', 'rider', 'intermedio', pwd_hash, 'AB+', NULL, NULL, 'Hugo Castro', '+57 321 222 0015', 'Hermano', 14, 2700),
+    ('b0000000-0000-0000-0000-000000000025', 'Tomás Ortega', 'Tomi', 'tomas@calithunder.co', '+57 320 111 0016', 'TO', 'rider', 'novato', pwd_hash, 'O-', NULL, NULL, 'Carla Ortega', '+57 321 222 0016', 'Esposa', 3, 600),
+    ('b0000000-0000-0000-0000-000000000026', 'Paula Rivas', 'Pau', 'paula@calithunder.co', '+57 320 111 0017', 'PR', 'rider', 'basico', pwd_hash, 'A+', NULL, NULL, 'Mario Rivas', '+57 321 222 0017', 'Padre', 9, 1800),
+    ('b0000000-0000-0000-0000-000000000027', 'Javier Salazar', 'Javi', 'javier@calithunder.co', '+57 320 111 0018', 'JS', 'rider', 'intermedio', pwd_hash, 'B+', NULL, NULL, 'Nora Salazar', '+57 321 222 0018', 'Madre', 13, 2900),
+    ('b0000000-0000-0000-0000-000000000028', 'Carolina Mejía', 'Caro', 'caro@calithunder.co', '+57 320 111 0019', 'CM', 'rider', 'avanzado', pwd_hash, 'O+', NULL, NULL, 'Daniel Mejía', '+57 321 222 0019', 'Hermano', 17, 3500);
 
 -- ── 3. ASIGNACIÓN DE CARGOS ─────────────────────────────────────────────────
 INSERT INTO user_positions (user_id, position_id, assigned_by) VALUES
@@ -331,8 +348,8 @@ INSERT INTO plans (id, name, price_monthly_cents, price_yearly_cents, max_member
 -- Clubs
 INSERT INTO clubs (id, name, slug, description, city, department, nit, billing_address, billing_phone, billing_contact_name, billing_contact_email, tax_regime, is_active, created_at) VALUES
 ('d0000000-0000-0000-0000-000000000010', 'Iron Biker''s Cartagena', 'iron-bikers-cartagena', 'Club de motociclismo de Cartagena y la región Caribe.', 'Cartagena', 'Bolívar', '900123456-7', 'Cra 15 #23-45, Cartagena', '+57 315 432 1098', 'Carlos Herrera', 'carlos@ironbikers.co', 'simplificado', TRUE, '2026-01-10 10:00:00'),
-('d0000000-0000-0000-0000-000000000020', 'Medellín Riders', 'medellin-riders', 'Comunidad de motociclistas paisas.', 'Medellín', 'Antioquia', '901234567-8', 'Calle 10 #40-20, Medellín', '+57 300 654 3210', 'Andrea Martínez', 'andrea@medellin-riders.co', 'simplificado', TRUE, '2026-02-15 09:00:00'),
-('d0000000-0000-0000-0000-000000000030', 'Bogotá Rebels', 'bogota-rebels', 'Motoclub urbano de Bogotá.', 'Bogotá', 'Cundinamarca', '902345678-9', 'Carrera 7 #30-15, Bogotá', '+57 311 888 9900', 'Miguel Ángel Torres', 'miguel@bogota-rebels.co', 'comun', TRUE, '2026-03-01 08:00:00'),
+('d0000000-0000-0000-0000-000000000020', 'Medellín Riders', 'medellin-riders', 'Comunidad de motociclistas paisas.', 'Medellín', 'Antioquia', '901234567-8', 'Calle 10 #40-20, Medellín', '+57 320 111 0007', 'Lucía Fernández', 'lucia@medellin-riders.co', 'simplificado', TRUE, '2026-02-15 09:00:00'),
+('d0000000-0000-0000-0000-000000000030', 'Bogotá Rebels', 'bogota-rebels', 'Motoclub urbano de Bogotá.', 'Bogotá', 'Cundinamarca', '902345678-9', 'Carrera 7 #30-15, Bogotá', '+57 320 111 0010', 'Ricardo Mendoza', 'ricardo@bogota-rebels.co', 'comun', TRUE, '2026-03-01 08:00:00'),
 ('d0000000-0000-0000-0000-000000000040', 'Cali Thunder', 'cali-thunder', 'Club de motociclismo de Cali con plan de prueba.', 'Cali', 'Valle del Cauca', '903456789-0', 'Av. Circunvalar #15-20, Cali', '+57 318 222 3333', 'Sofía Mendoza', 'sofia@calithunder.co', 'simplificado', TRUE, '2026-04-10 10:00:00');
 
 -- Roles de rodada por defecto para cada club
@@ -378,7 +395,7 @@ INSERT INTO club_ride_roles (club_id, slug, name, is_unique, sort_order) VALUES
 ('d0000000-0000-0000-0000-000000000040', 'comunicador', 'Comunicador', false, 9),
 ('d0000000-0000-0000-0000-000000000040', 'rider', 'Piloto', false, 10);
 
--- Miembros de Iron Biker's Cartagena
+-- Miembros de Iron Biker's Cartagena (8 miembros)
 INSERT INTO club_members (club_id, user_id, role, joined_at, invited_by, is_active) VALUES
 ('d0000000-0000-0000-0000-000000000010', 'b0000000-0000-0000-0000-000000000001', 'admin', '2026-01-10 10:00:00', 'b0000000-0000-0000-0000-000000000001', TRUE),
 ('d0000000-0000-0000-0000-000000000010', 'b0000000-0000-0000-0000-000000000002', 'leader', '2026-01-12 09:00:00', 'b0000000-0000-0000-0000-000000000001', TRUE),
@@ -389,22 +406,19 @@ INSERT INTO club_members (club_id, user_id, role, joined_at, invited_by, is_acti
 ('d0000000-0000-0000-0000-000000000010', 'b0000000-0000-0000-0000-000000000007', 'leader', '2026-01-28 06:00:00', 'b0000000-0000-0000-0000-000000000001', TRUE),
 ('d0000000-0000-0000-0000-000000000010', 'b0000000-0000-0000-0000-000000000008', 'rider', '2026-01-30 06:00:00', 'b0000000-0000-0000-0000-000000000001', TRUE);
 
--- Miembros de Medellín Riders (cross-club)
+-- Miembros de Medellín Riders (3 miembros)
 INSERT INTO club_members (club_id, user_id, role, joined_at, invited_by, is_active) VALUES
-('d0000000-0000-0000-0000-000000000020', 'b0000000-0000-0000-0000-000000000002', 'admin', '2026-02-15 09:00:00', 'b0000000-0000-0000-0000-000000000002', TRUE),
-('d0000000-0000-0000-0000-000000000020', 'b0000000-0000-0000-0000-000000000001', 'rider', '2026-02-16 10:00:00', 'b0000000-0000-0000-0000-000000000002', TRUE),
-('d0000000-0000-0000-0000-000000000020', 'b0000000-0000-0000-0000-000000000005', 'rider', '2026-02-18 08:00:00', 'b0000000-0000-0000-0000-000000000002', TRUE);
+('d0000000-0000-0000-0000-000000000020', 'b0000000-0000-0000-0000-000000000016', 'admin', '2026-02-15 09:00:00', 'b0000000-0000-0000-0000-000000000016', TRUE),
+('d0000000-0000-0000-0000-000000000020', 'b0000000-0000-0000-0000-000000000017', 'leader', '2026-02-16 10:00:00', 'b0000000-0000-0000-0000-000000000016', TRUE),
+('d0000000-0000-0000-0000-000000000020', 'b0000000-0000-0000-0000-000000000018', 'rider', '2026-02-18 08:00:00', 'b0000000-0000-0000-0000-000000000016', TRUE);
 
--- Miembros de Bogotá Rebels
+-- Miembros de Bogotá Rebels (2 miembros)
 INSERT INTO club_members (club_id, user_id, role, joined_at, invited_by, is_active) VALUES
-('d0000000-0000-0000-0000-000000000030', 'b0000000-0000-0000-0000-000000000007', 'admin', '2026-03-01 08:00:00', 'b0000000-0000-0000-0000-000000000007', TRUE),
-('d0000000-0000-0000-0000-000000000030', 'b0000000-0000-0000-0000-000000000008', 'rider', '2026-03-05 09:00:00', 'b0000000-0000-0000-0000-000000000007', TRUE);
+('d0000000-0000-0000-0000-000000000030', 'b0000000-0000-0000-0000-000000000019', 'admin', '2026-03-01 08:00:00', 'b0000000-0000-0000-0000-000000000019', TRUE),
+('d0000000-0000-0000-0000-000000000030', 'b0000000-0000-0000-0000-000000000020', 'rider', '2026-03-05 09:00:00', 'b0000000-0000-0000-0000-000000000019', TRUE);
 
 -- Miembros de Cali Thunder (15 = límite del plan Prueba)
 INSERT INTO club_members (club_id, user_id, role, joined_at, invited_by, is_active) VALUES
-('d0000000-0000-0000-0000-000000000010', 'b0000000-0000-0000-0000-000000000000', 'admin', '2026-01-10 10:00:00', 'b0000000-0000-0000-0000-000000000000', TRUE),
-('d0000000-0000-0000-0000-000000000020', 'b0000000-0000-0000-0000-000000000000', 'admin', '2026-02-15 09:00:00', 'b0000000-0000-0000-0000-000000000000', TRUE),
-('d0000000-0000-0000-0000-000000000030', 'b0000000-0000-0000-0000-000000000000', 'admin', '2026-03-01 08:00:00', 'b0000000-0000-0000-0000-000000000000', TRUE),
 ('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000009', 'admin', '2026-04-10 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
 ('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000010', 'rider', '2026-04-11 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
 ('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000011', 'rider', '2026-04-12 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
@@ -412,14 +426,14 @@ INSERT INTO club_members (club_id, user_id, role, joined_at, invited_by, is_acti
 ('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000013', 'rider', '2026-04-14 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
 ('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000014', 'rider', '2026-04-15 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
 ('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000015', 'rider', '2026-04-16 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
-('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000001', 'rider', '2026-04-17 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
-('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000002', 'rider', '2026-04-18 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
-('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000003', 'rider', '2026-04-19 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
-('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000004', 'rider', '2026-04-20 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
-('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000005', 'rider', '2026-04-21 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
-('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000006', 'rider', '2026-04-22 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
-('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000007', 'rider', '2026-04-23 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
-('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000008', 'rider', '2026-04-24 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE);
+('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000021', 'rider', '2026-04-17 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
+('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000022', 'rider', '2026-04-18 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
+('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000023', 'rider', '2026-04-19 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
+('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000024', 'rider', '2026-04-20 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
+('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000025', 'rider', '2026-04-21 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
+('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000026', 'rider', '2026-04-22 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
+('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000027', 'rider', '2026-04-23 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE),
+('d0000000-0000-0000-0000-000000000040', 'b0000000-0000-0000-0000-000000000028', 'rider', '2026-04-24 10:00:00', 'b0000000-0000-0000-0000-000000000009', TRUE);
 
 -- Suscripciones
 INSERT INTO club_subscriptions (id, club_id, plan_id, status, billing_cycle, current_period_start, current_period_end, trial_ends_at, created_at) VALUES
