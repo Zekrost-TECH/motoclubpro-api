@@ -3,7 +3,7 @@ import { DatabaseService } from '../database/database.service';
 import { Redis } from 'ioredis';
 import { CreateSosDto } from './dto/create-sos.dto';
 import { FcmService } from '../notifications/fcm.service';
-import { SosAlertRow, SosAlertSummary, AlertStatus } from './sos.types';
+import { SosAlertRow, SosAlertSummary } from './sos.types';
 
 @Injectable()
 export class SosService {
