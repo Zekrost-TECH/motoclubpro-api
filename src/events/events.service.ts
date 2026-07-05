@@ -28,6 +28,8 @@ export interface EventRow {
     max_attendees?: number;
     min_rider_level?: string;
     meeting_point?: string;
+    meeting_point_lat?: number;
+    meeting_point_lng?: number;
     organizer_id?: string;
     club_id?: string;
     created_at?: string;
@@ -120,13 +122,15 @@ export class EventsService {
             max_attendees,
             min_rider_level,
             meeting_point,
+            meeting_point_lat,
+            meeting_point_lng,
         } = createEventDto;
 
         const res = await this.db.query<EventRow>(
             `INSERT INTO events (
         title, description, date, time, difficulty, route_id,
-        max_attendees, min_rider_level, meeting_point, organizer_id, club_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        max_attendees, min_rider_level, meeting_point, meeting_point_lat, meeting_point_lng, organizer_id, club_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
             [
                 title,
                 description,
@@ -137,6 +141,8 @@ export class EventsService {
                 max_attendees || null,
                 min_rider_level || 'novato',
                 meeting_point || null,
+                meeting_point_lat ?? null,
+                meeting_point_lng ?? null,
                 userId,
                 clubId || null,
             ],

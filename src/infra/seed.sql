@@ -255,11 +255,11 @@ INSERT INTO maintenance_history (motorcycle_id, type, description, km, date, cos
     ('c0000000-0000-0000-0000-000000000008', 'cadena', 'Kit cadena + piñones RK', 6000, '2025-12-01', 190000);
 
 -- ── 6. RUTAS ────────────────────────────────────────────────────────────────
-INSERT INTO routes (id, name, description, difficulty, distance_km, estimated_time, elevation_min, elevation_max) VALUES
-    ('d0000000-0000-0000-0000-000000000001', 'Cartagena → Volcán del Totumo', 'Ruta costera pasando por Bayunca...', 'suave', 52, '1h 30min', 2, 45),
-    ('d0000000-0000-0000-0000-000000000002', 'Vuelta a la Ciénaga de la Virgen', 'Circuito alrededor de la Ciénaga...', 'suave', 38, '1h 15min', 0, 15),
-    ('d0000000-0000-0000-0000-000000000003', 'Cartagena → San Jacinto (Sierra)', 'Ruta de montaña hacia los Montes de María...', 'expertos', 148, '4h 00min', 10, 820),
-    ('d0000000-0000-0000-0000-000000000004', 'Travesía Costera: Cartagena → Tolú', 'Viaje largo por la costa caribe...', 'viaje_largo', 230, '5h 30min', 0, 60);
+INSERT INTO routes (id, name, description, difficulty, distance_km, estimated_time, elevation_min, elevation_max, start_lat, start_lng, start_name) VALUES
+    ('d0000000-0000-0000-0000-000000000001', 'Cartagena → Volcán del Totumo', 'Ruta costera pasando por Bayunca...', 'suave', 52, '1h 30min', 2, 45, 10.3997, -75.5144, 'Centro Comercial Caribe Plaza'),
+    ('d0000000-0000-0000-0000-000000000002', 'Vuelta a la Ciénaga de la Virgen', 'Circuito alrededor de la Ciénaga...', 'suave', 38, '1h 15min', 0, 15, 10.3932, -75.556, 'Parqueadero Bocagrande'),
+    ('d0000000-0000-0000-0000-000000000003', 'Cartagena → San Jacinto (Sierra)', 'Ruta de montaña hacia los Montes de María...', 'expertos', 148, '4h 00min', 10, 820, 10.33, -75.41, 'Peaje Turbaco'),
+    ('d0000000-0000-0000-0000-000000000004', 'Travesía Costera: Cartagena → Tolú', 'Viaje largo por la costa caribe...', 'viaje_largo', 230, '5h 30min', 0, 60, 10.3997, -75.5144, 'CC Caribe Plaza');
 
 -- WAYPOINTS (IMPORTANTE: ST_MakePoint requiere longitud primero, luego latitud)
 INSERT INTO route_waypoints (route_id, name, location, type, estimated_arrival, sort_order, notes) VALUES
@@ -286,11 +286,11 @@ INSERT INTO route_waypoints (route_id, name, location, type, estimated_arrival, 
     ('d0000000-0000-0000-0000-000000000004', 'Malecón de Tolú', ST_SetSRID(ST_MakePoint(-75.5832, 9.5233), 4326), 'destino', '11:00', 3, NULL);
 
 -- ── 7. EVENTOS Y LOGÍSTICA ──────────────────────────────────────────────────
-INSERT INTO events (id, title, description, date, time, difficulty, route_id, status, max_attendees, min_rider_level, meeting_point, organizer_id) VALUES
-    ('e0000000-0000-0000-0000-000000000001', 'Rodada al Volcán del Totumo', 'Rodada dominical clásica. Salida temprana...', '2026-06-25', '07:00:00', 'suave', 'd0000000-0000-0000-0000-000000000001', 'proximo', 20, 'novato', 'Parqueadero CC Caribe Plaza', 'b0000000-0000-0000-0000-000000000001'),
-    ('e0000000-0000-0000-0000-000000000002', 'Travesía a San Jacinto — Solo Expertos', 'Ruta de montaña exigente por los Montes de María...', '2026-06-28', '06:00:00', 'expertos', 'd0000000-0000-0000-0000-000000000003', 'proximo', 12, 'avanzado', 'Peaje de Turbaco', 'b0000000-0000-0000-0000-000000000002'),
-    ('e0000000-0000-0000-0000-000000000003', 'Vuelta a la Ciénaga — Rodada Fotográfica', 'Rodada tranquila alrededor de la Ciénaga...', '2026-06-20', '06:30:00', 'suave', 'd0000000-0000-0000-0000-000000000002', 'completado', 25, 'novato', 'Parqueadero Bocagrande', 'b0000000-0000-0000-0000-000000000001'),
-    ('e0000000-0000-0000-0000-000000000004', 'Gran Travesía Costera a Tolú', 'Viaje de fin de semana completo...', '2026-07-05', '05:30:00', 'viaje_largo', 'd0000000-0000-0000-0000-000000000004', 'proximo', 15, 'intermedio', 'CC Caribe Plaza', 'b0000000-0000-0000-0000-000000000001');
+INSERT INTO events (id, title, description, date, time, difficulty, route_id, status, max_attendees, min_rider_level, meeting_point, meeting_point_lat, meeting_point_lng, organizer_id) VALUES
+    ('e0000000-0000-0000-0000-000000000001', 'Rodada al Volcán del Totumo', 'Rodada dominical clásica. Salida temprana...', '2026-06-25', '07:00:00', 'suave', 'd0000000-0000-0000-0000-000000000001', 'proximo', 20, 'novato', 'Parqueadero CC Caribe Plaza', 10.3997, -75.5144, 'b0000000-0000-0000-0000-000000000001'),
+    ('e0000000-0000-0000-0000-000000000002', 'Travesía a San Jacinto — Solo Expertos', 'Ruta de montaña exigente por los Montes de María...', '2026-06-28', '06:00:00', 'expertos', 'd0000000-0000-0000-0000-000000000003', 'proximo', 12, 'avanzado', 'Peaje de Turbaco', 10.33, -75.41, 'b0000000-0000-0000-0000-000000000002'),
+    ('e0000000-0000-0000-0000-000000000003', 'Vuelta a la Ciénaga — Rodada Fotográfica', 'Rodada tranquila alrededor de la Ciénaga...', '2026-06-20', '06:30:00', 'suave', 'd0000000-0000-0000-0000-000000000002', 'completado', 25, 'novato', 'Parqueadero Bocagrande', 10.3932, -75.556, 'b0000000-0000-0000-0000-000000000001'),
+    ('e0000000-0000-0000-0000-000000000004', 'Gran Travesía Costera a Tolú', 'Viaje de fin de semana completo...', '2026-07-05', '05:30:00', 'viaje_largo', 'd0000000-0000-0000-0000-000000000004', 'proximo', 15, 'intermedio', 'CC Caribe Plaza', 10.3997, -75.5144, 'b0000000-0000-0000-0000-000000000001');
 
 INSERT INTO event_attendees (event_id, user_id, ride_role, checklist_completed, confirmed_at) VALUES
     -- Evento 1: Totumo

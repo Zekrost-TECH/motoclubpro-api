@@ -14,14 +14,15 @@ export class RoutesService {
         const { rows } = await this.db.query<Route>(
             `INSERT INTO routes (
                 id, name, description, difficulty, distance_km, estimated_time,
-                elevation_min, elevation_max, geojson, created_by, club_id,
+                elevation_min, elevation_max, geojson, start_lat, start_lng, start_name, created_by, club_id,
                 created_at, updated_at
             ) VALUES (
-                gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW()
+                gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW()
             ) RETURNING
                 id, name, description, difficulty, distance_km AS "distanceKm",
                 estimated_time AS "estimatedTime", elevation_min AS "elevationMin",
-                elevation_max AS "elevationMax", geojson, created_by AS "createdBy",
+                elevation_max AS "elevationMax", geojson, start_lat AS "startLat",
+                start_lng AS "startLng", start_name AS "startName", created_by AS "createdBy",
                 created_at AS "createdAt", updated_at AS "updatedAt"`,
             [
                 data.name,
@@ -32,6 +33,9 @@ export class RoutesService {
                 data.elevationMin || null,
                 data.elevationMax || null,
                 data.geojson ? JSON.stringify(data.geojson) : null,
+                data.start_lat ?? null,
+                data.start_lng ?? null,
+                data.start_name || null,
                 userId,
                 clubId || null,
             ],
@@ -75,7 +79,8 @@ export class RoutesService {
     async findOne(id: string, clubId?: string): Promise<Route> {
         let query = `SELECT id, name, description, difficulty, distance_km AS "distanceKm",
                     estimated_time AS "estimatedTime", elevation_min AS "elevationMin",
-                    elevation_max AS "elevationMax", geojson, created_by AS "createdBy",
+                    elevation_max AS "elevationMax", geojson, start_lat AS "startLat",
+                    start_lng AS "startLng", start_name AS "startName", created_by AS "createdBy",
                     created_at AS "createdAt", updated_at AS "updatedAt"
              FROM routes
              WHERE id = $1`;
@@ -120,7 +125,8 @@ export class RoutesService {
         }
         query += ` RETURNING id, name, description, difficulty, distance_km AS "distanceKm",
                        estimated_time AS "estimatedTime", elevation_min AS "elevationMin",
-                       elevation_max AS "elevationMax", geojson, created_by AS "createdBy",
+                       elevation_max AS "elevationMax", geojson, start_lat AS "startLat",
+                       start_lng AS "startLng", start_name AS "startName", created_by AS "createdBy",
                        created_at AS "createdAt", updated_at AS "updatedAt"`;
 
         const { rows } = await this.db.query<Route>(query, values);

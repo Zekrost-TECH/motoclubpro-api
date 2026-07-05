@@ -16,6 +16,8 @@ export interface Event {
     max_attendees?: number;
     min_rider_level: RiderLevel;
     meeting_point?: string;
+    meeting_point_lat?: number;
+    meeting_point_lng?: number;
     organizer_id: string;
     created_at: Date;
     updated_at: Date;

@@ -24,6 +24,9 @@ export interface Route {
     elevationMin?: number;
     elevationMax?: number;
     geojson?: Record<string, unknown>;
+    startLat?: number;
+    startLng?: number;
+    startName?: string;
     createdBy?: string;
     createdAt: Date;
     updatedAt: Date;

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsDateString, IsEnum, IsNumber, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsEnum, IsNumber, IsUUID, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { RouteDifficulty, RiderLevel, EventStatus } from '../events.types';
 
@@ -48,4 +48,18 @@ export class CreateEventDto {
     @IsOptional()
     @IsString()
     meeting_point?: string;
+
+    @ApiPropertyOptional({ description: 'Meeting point latitude', minimum: -90, maximum: 90 })
+    @IsOptional()
+    @IsNumber()
+    @Min(-90)
+    @Max(90)
+    meeting_point_lat?: number;
+
+    @ApiPropertyOptional({ description: 'Meeting point longitude', minimum: -180, maximum: 180 })
+    @IsOptional()
+    @IsNumber()
+    @Min(-180)
+    @Max(180)
+    meeting_point_lng?: number;
 }
