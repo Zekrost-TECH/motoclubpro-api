@@ -1,5 +1,5 @@
 -- ============================================================================
--- SCRIPT DE SEMILLA (SEED) PARA MOTOCLUB PRO
+-- SCRIPT DE SEMILLA (SEED) PARA BIKEROS
 -- ============================================================================
 -- Limpieza de tablas para permitir ejecuciones repetibles del seed
 -- Asegurar tablas de multiclub + billing (si el volumen se recrea sin migraciones)

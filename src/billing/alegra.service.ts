@@ -88,7 +88,7 @@ export class AlegraService {
 
     const items: AlegraInvoiceItem[] = [
       {
-        name: `Suscripcion MotoClubPro - ${planName}`,
+        name: `Suscripcion BikerOS - ${planName}`,
         price: planAmountCents / 100,
         quantity: 1,
         taxes: [],

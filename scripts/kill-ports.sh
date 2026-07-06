@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mata procesos locales que ocupan los puertos de desarrollo del stack MotoClub Pro.
+# Mata procesos locales que ocupan los puertos de desarrollo del stack BikerOS.
 # Puertos cubiertos: API (3000), Web/App Vite (5173), Tracker (8081),
 # Adminer (8080), Postgres (5432), Redis (6379), y los puertos de E2E
 # (13000, 18081, 18080, 15432, 16379).

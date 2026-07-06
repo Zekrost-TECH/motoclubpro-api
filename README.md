@@ -1,6 +1,6 @@
-# MotoClub Pro API
+# BikerOS API
 
-Backend API REST para MotoClub Pro, plataforma SaaS multiclub para gestion de clubes de motociclismo en Colombia.
+Backend API REST para BikerOS, plataforma SaaS multiclub para gestion de clubes de motociclismo en Colombia.
 
 ## Stack Tecnologico
 
@@ -70,7 +70,7 @@ src/
 ## Instalacion
 
 ```bash
-cd motoclubpro-api
+cd biker-os-api
 
 # Dependencias
 bun install
@@ -80,7 +80,7 @@ cp .env.example .env
 # Editar .env con tus credenciales
 
 # Base de datos (crear DB y ejecutar migraciones)
-# Ver motoclubpro-api/infra/ para scripts SQL
+# Ver biker-os-api/infra/ para scripts SQL
 
 # Desarrollo con hot-reload
 bun run start:dev
@@ -118,13 +118,13 @@ Ver `.env.example` para la lista completa. Clave:
 
 ```bash
 # Build de produccion
-docker build -f Dockerfile -t motoclubpro-api:latest .
+docker build -f Dockerfile -t biker-os-api:latest .
 
 # Build de desarrollo
-docker build -f Dockerfile.dev -t motoclubpro-api:dev .
+docker build -f Dockerfile.dev -t biker-os-api:dev .
 
 # Correr
-docker run -d -p 3000:3000 --env-file .env motoclubpro-api:latest
+docker run -d -p 3000:3000 --env-file .env biker-os-api:latest
 ```
 
 ## Convenciones API

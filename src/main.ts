@@ -106,7 +106,7 @@ async function bootstrap() {
 
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
-      .setTitle('MotoClubPro API')
+      .setTitle('BikerOS API')
       .setDescription('Multi-tenant SaaS API for managing motorcycle clubs in Colombia')
       .setVersion('1.0')
       .addBearerAuth()

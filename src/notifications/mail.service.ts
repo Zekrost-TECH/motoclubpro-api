@@ -25,25 +25,25 @@ export class MailService {
     }
 
     async sendInvitation(ctx: InviteMailContext): Promise<void> {
-        const subject = `Invitación a unirte a ${ctx.clubName} en MotoClub Pro`;
+        const subject = `Invitación a unirte a ${ctx.clubName} en BikerOS`;
         const body = `
 Hola,
 
-${ctx.inviterName} te invitó a unirte a ${ctx.clubName} en MotoClub Pro.
+${ctx.inviterName} te invitó a unirte a ${ctx.clubName} en BikerOS.
 
 Tu cuenta ha sido creada con la contraseña temporal: ${ctx.tempPassword}
-Descarga la app MotoClub Pro e inicia sesión con tu correo y esta contraseña.
+Descarga la app BikerOS e inicia sesión con tu correo y esta contraseña.
 
 Te recomendamos cambiar tu contraseña después de iniciar sesión.
 
 Saludos,
-Equipo MotoClub Pro
+Equipo BikerOS
         `.trim();
 
         const transporter = this.getTransporter();
         if (transporter) {
             await transporter.sendMail({
-                from: process.env.SMTP_FROM || 'noreply@motoclubpro.local',
+                from: process.env.SMTP_FROM || 'noreply@biker-os.local',
                 to: ctx.email,
                 subject,
                 text: body,

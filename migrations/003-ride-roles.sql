@@ -1,5 +1,5 @@
 -- Migration: Dynamic ride roles per club
--- Project: MotoClubPro by Zekrost
+-- Project: BikerOS by Zekrost
 -- Run this manually against existing PostgreSQL instances
 
 BEGIN;

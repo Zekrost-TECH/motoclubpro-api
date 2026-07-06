@@ -8,11 +8,11 @@ services:
   # ── PostgreSQL + PostGIS ───────────────────────────────────────────────────
   postgres:
     image: postgis/postgis:16-3.4-alpine
-    container_name: motoclubpro_postgres_e2e
+    container_name: biker-os_postgres_e2e
     restart: unless-stopped
     environment:
-      POSTGRES_DB: motoclubpro
-      POSTGRES_USER: motoclubpro
+      POSTGRES_DB: biker-os
+      POSTGRES_USER: biker-os
       POSTGRES_PASSWORD: dev_secret
     ports:
       - "15432:5432"
@@ -21,7 +21,7 @@ services:
       - ./src/infra/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./src/infra/seed.sql:/docker-entrypoint-initdb.d/seed.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U motoclubpro -d motoclubpro"]
+      test: ["CMD-SHELL", "pg_isready -U biker-os -d biker-os"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -30,7 +30,7 @@ services:
   # ── Redis ─────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: motoclubpro_redis_e2e
+    container_name: biker-os_redis_e2e
     restart: unless-stopped
     command: >
       redis-server
@@ -49,10 +49,10 @@ services:
   # ── API NestJS ─────────────────────────────────────────────────────────────
   api:
     build:
-      context: ../motoclubpro-api
+      context: ../biker-os-api
       dockerfile: Dockerfile.dev
       target: runner
-    container_name: motoclubpro_api_e2e
+    container_name: biker-os_api_e2e
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
@@ -62,7 +62,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: postgresql://motoclubpro:dev_secret@postgres:5432/motoclubpro
+      DATABASE_URL: postgresql://biker-os:dev_secret@postgres:5432/biker-os
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev_jwt_secret_change_in_production
       JWT_EXPIRES_IN: 15m
@@ -81,16 +81,16 @@ services:
       SMTP_PORT: 1025
       SMTP_USER: ""
       SMTP_PASS: ""
-      SMTP_FROM: noreply@motoclubpro.local
+      SMTP_FROM: noreply@biker-os.local
       WEB_URL: http://localhost:5173
 
   # ── Tracker Go ────────────────────────────────────────────────────────────
   tracker:
     build:
-      context: ../motoclubpro-tracker
+      context: ../biker-os-tracker
       dockerfile: Dockerfile.dev
       target: builder
-    container_name: motoclubpro_tracker_e2e
+    container_name: biker-os_tracker_e2e
     restart: unless-stopped
     depends_on:
       redis: { condition: service_healthy }
@@ -106,7 +106,7 @@ services:
   # ── Adminer (UI para ver la DB en dev) ────────────────────────────────────
   adminer:
     image: adminer:latest
-    container_name: motoclubpro_adminer_e2e
+    container_name: biker-os_adminer_e2e
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
@@ -119,7 +119,7 @@ services:
   # ── MailPit (SMTP trap + Web UI para ver correos en dev) ──────────────────
   mailpit:
     image: axllent/mailpit:latest
-    container_name: motoclubpro_mailpit_e2e
+    container_name: biker-os_mailpit_e2e
     restart: unless-stopped
     ports:
       - "18025:1025" # SMTP server
@@ -137,6 +137,6 @@ services:
 
 volumes:
   pgdata_e2e:
-    name: motoclubpro_pgdata_e2e
+    name: biker-os_pgdata_e2e
   mailpit_data:
-    name: motoclubpro_mailpit_data
+    name: biker-os_mailpit_data

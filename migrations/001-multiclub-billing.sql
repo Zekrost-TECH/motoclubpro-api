@@ -1,5 +1,5 @@
 -- Migration: Multi-club SaaS + Billing (Wompi + Alegra)
--- Project: MotoClubPro by Zekrost
+-- Project: BikerOS by Zekrost
 -- Run this manually against your PostgreSQL instance
 
 BEGIN;
