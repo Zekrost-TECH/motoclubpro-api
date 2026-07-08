@@ -7,6 +7,7 @@ import { AuthModule } from '../src/auth/auth.module';
 import { DatabaseModule } from '../src/database/database.module';
 import { RedisModule } from '../src/redis/redis.module';
 import { DatabaseService } from '../src/database/database.service';
+import { TurnstileService } from '../src/turnstile/turnstile.service';
 
 const send = request as unknown as typeof import('supertest');
 
@@ -14,6 +15,7 @@ describe('Auth (e2e)', () => {
     let app: INestApplication;
     let dbQueryMock: jest.Mock;
     let redisMock: { get: jest.Mock; set: jest.Mock };
+    let turnstileVerifyMock: jest.Mock;
 
     let passwordHash: string;
     const password = 'Password123';
@@ -54,6 +56,8 @@ describe('Auth (e2e)', () => {
             set: jest.fn().mockResolvedValue('OK'),
         };
 
+        turnstileVerifyMock = jest.fn().mockResolvedValue(true);
+
         const moduleFixture: TestingModule = await Test.createTestingModule({
             imports: [
                 ConfigModule.forRoot({
@@ -76,6 +80,8 @@ describe('Auth (e2e)', () => {
             .useValue({ query: dbQueryMock, getPool: jest.fn() })
             .overrideProvider('REDIS_CLIENT')
             .useValue(redisMock)
+            .overrideProvider(TurnstileService)
+            .useValue({ verifyToken: turnstileVerifyMock })
             .compile();
 
         app = moduleFixture.createNestApplication();
@@ -125,6 +131,25 @@ describe('Auth (e2e)', () => {
             .send({ email: 'nobody@example.com', password: 'wrong' });
 
         expect(res.status).toBe(401);
+    });
+
+    it('POST /auth/login should return 401 when Turnstile verification fails', async () => {
+        turnstileVerifyMock.mockResolvedValueOnce(false);
+        loginUserRows = [{
+            id: 'user-1',
+            name: 'New Rider',
+            email: 'rider@example.com',
+            role: 'piloto',
+            passwordHash,
+            isActive: true,
+        }];
+
+        const res = await send(app.getHttpServer())
+            .post('/auth/login')
+            .send({ email: 'rider@example.com', password, turnstileToken: 'invalid-token' });
+
+        expect(res.status).toBe(401);
+        expect(turnstileVerifyMock).toHaveBeenCalledWith('invalid-token', expect.any(String));
     });
 
     it('POST /auth/refresh should issue new tokens with a valid refresh token', async () => {

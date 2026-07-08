@@ -1,25 +1,38 @@
 import {
     Controller, Post, Get, UseGuards, Request,
-    Body, UnauthorizedException, HttpCode, ForbiddenException,
+    Body, UnauthorizedException, HttpCode, ForbiddenException, Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { TurnstileService } from '../turnstile/turnstile.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import type { AuthRequest, AuthResponse } from './auth.types';
 
+interface RequestWithIp {
+    ip?: string;
+}
+
 @Controller('auth')
 @ApiTags('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) { }
+    constructor(
+        private readonly authService: AuthService,
+        private readonly turnstileService: TurnstileService,
+    ) { }
 
     // Limitar los intentos de login: max 5 intentos en bloque de 1 minuto (60000ms)
     @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('login')
     @HttpCode(200)
-    async login(@Body() body: LoginDto): Promise<AuthResponse> {
+    async login(@Body() body: LoginDto, @Req() req: RequestWithIp): Promise<AuthResponse> {
+        const turnstileValid = await this.turnstileService.verifyToken(body.turnstileToken, req.ip);
+        if (!turnstileValid) {
+            throw new UnauthorizedException('Verificacion de seguridad fallida. Intenta de nuevo.');
+        }
+
         const user = await this.authService.validateUser(body.email, body.password);
         if (!user) throw new UnauthorizedException('Credenciales inválidas');
         return this.authService.login(user);

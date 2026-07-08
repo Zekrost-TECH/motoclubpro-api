@@ -11,10 +11,12 @@ import { RolesGuard } from './guards/roles.guard';
 import { ClubGuard } from './guards/club.guard';
 import { ClubRolesGuard } from './guards/club-roles.guard';
 import { SelfOrAdminGuard } from './guards/self-or-admin.guard';
+import { TurnstileModule } from '../turnstile/turnstile.module';
 
 @Module({
     imports: [
         UsersModule,
+        TurnstileModule,
         PassportModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],
