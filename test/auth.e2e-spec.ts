@@ -133,7 +133,28 @@ describe('Auth (e2e)', () => {
         expect(res.status).toBe(401);
     });
 
-    it('POST /auth/login should return 401 when Turnstile verification fails', async () => {
+    it('POST /auth/login/web should return tokens with valid credentials and Turnstile token', async () => {
+        turnstileVerifyMock.mockResolvedValueOnce(true);
+        loginUserRows = [{
+            id: 'user-1',
+            name: 'New Rider',
+            email: 'rider@example.com',
+            role: 'piloto',
+            passwordHash,
+            isActive: true,
+        }];
+
+        const res = await send(app.getHttpServer())
+            .post('/auth/login/web')
+            .send({ email: 'rider@example.com', password, turnstileToken: 'valid-token' });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('access_token');
+        expect(res.body).toHaveProperty('refresh_token');
+        expect(turnstileVerifyMock).toHaveBeenCalledWith('valid-token', expect.any(String));
+    });
+
+    it('POST /auth/login/web should return 401 when Turnstile verification fails', async () => {
         turnstileVerifyMock.mockResolvedValueOnce(false);
         loginUserRows = [{
             id: 'user-1',
@@ -145,7 +166,7 @@ describe('Auth (e2e)', () => {
         }];
 
         const res = await send(app.getHttpServer())
-            .post('/auth/login')
+            .post('/auth/login/web')
             .send({ email: 'rider@example.com', password, turnstileToken: 'invalid-token' });
 
         expect(res.status).toBe(401);

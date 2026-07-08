@@ -23,11 +23,23 @@ export class AuthController {
         private readonly turnstileService: TurnstileService,
     ) { }
 
+    // Login para la app movil (sin Turnstile)
     // Limitar los intentos de login: max 5 intentos en bloque de 1 minuto (60000ms)
     @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('login')
     @HttpCode(200)
-    async login(@Body() body: LoginDto, @Req() req: RequestWithIp): Promise<AuthResponse> {
+    async login(@Body() body: LoginDto): Promise<AuthResponse> {
+        const user = await this.authService.validateUser(body.email, body.password);
+        if (!user) throw new UnauthorizedException('Credenciales inválidas');
+        return this.authService.login(user);
+    }
+
+    // Login exclusivo para el panel web (con Turnstile)
+    // Limitar los intentos de login: max 5 intentos en bloque de 1 minuto (60000ms)
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
+    @Post('login/web')
+    @HttpCode(200)
+    async loginWeb(@Body() body: LoginDto, @Req() req: RequestWithIp): Promise<AuthResponse> {
         const turnstileValid = await this.turnstileService.verifyToken(body.turnstileToken, req.ip);
         if (!turnstileValid) {
             throw new UnauthorizedException('Verificacion de seguridad fallida. Intenta de nuevo.');
