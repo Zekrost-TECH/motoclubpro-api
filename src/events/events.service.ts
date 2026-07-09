@@ -107,6 +107,28 @@ export class EventsService {
         }
     }
 
+    // Sincroniza las claves de autorización del tracker con la BD.
+    // Útil cuando los asistentes se modifican fuera del flujo RSVP (DB directa,
+    // imports, scripts) o simplemente como medida de seguridad en el read-path.
+    private async syncTrackerAuth(eventId: string, clubId?: string | null): Promise<void> {
+        if (clubId) {
+            await this.safeRedis(
+                () => this.redis.set(this.eventClubKey(eventId), clubId),
+                `set club key event ${eventId}`,
+            );
+        }
+
+        const attendees = await this.getAttendees(eventId);
+        const memberIds = attendees.map((a) => a.user_id);
+        if (memberIds.length === 0) return;
+
+        await this.safeRedis(async () => {
+            const key = this.eventMembersKey(eventId);
+            await this.redis.del(key);
+            await this.redis.sadd(key, ...memberIds);
+        }, `sync members event ${eventId}`);
+    }
+
     async create(createEventDto: CreateEventDto, userId: string, clubId?: string, userRole?: UserRole): Promise<EventRow> {
         if (clubId) {
             await this.plansService.assertCanCreateEvent(clubId, userRole);
@@ -222,6 +244,11 @@ export class EventsService {
         const event = res.rows[0];
         (event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[] }).attendees = await this.getAttendees(id, clubId);
         (event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[] }).inventory = await this.getInventory(id, clubId);
+
+        // Sincronizar autorización del tracker con la fuente de verdad (BD).
+        // Esto recupera asistentes añadidos manualmente en DB y repara drift.
+        await this.syncTrackerAuth(event.id, event.club_id ?? null);
+
         return event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[] };
     }
 
@@ -286,7 +313,14 @@ export class EventsService {
             [newStatus, id]
         );
 
-        return res.rows[0];
+        const updated = res.rows[0];
+        if (updated && newStatus === 'en_curso') {
+            // Antes de que los riders intenten conectarse, asegurar que Redis
+            // refleje los asistentes actuales de la BD.
+            await this.syncTrackerAuth(updated.id, updated.club_id ?? null);
+        }
+
+        return updated;
     }
 
     private async verifyEventClub(eventId: string, clubId?: string): Promise<void> {
