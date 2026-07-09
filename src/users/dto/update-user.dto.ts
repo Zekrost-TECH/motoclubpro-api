@@ -1,6 +1,18 @@
-import { IsString, IsOptional, IsArray, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsEnum, IsObject, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../users.types';
+
+class EmergencyContactDto {
+    @ApiPropertyOptional() @IsOptional() @IsString()
+    name?: string;
+
+    @ApiPropertyOptional() @IsOptional() @IsString()
+    phone?: string;
+
+    @ApiPropertyOptional() @IsOptional() @IsString()
+    relationship?: string;
+}
 
 export class UpdateUserDto {
     @ApiPropertyOptional() @IsOptional() @IsString()
@@ -47,6 +59,13 @@ export class UpdateUserDto {
 
     @ApiPropertyOptional() @IsOptional() @IsString()
     ecRelationship?: string;
+
+    @ApiPropertyOptional({ type: EmergencyContactDto })
+    @IsOptional()
+    @IsObject()
+    @ValidateNested()
+    @Type(() => EmergencyContactDto)
+    emergencyContact?: EmergencyContactDto;
 
     @ApiPropertyOptional() @IsOptional() @IsString()
     fcmToken?: string;

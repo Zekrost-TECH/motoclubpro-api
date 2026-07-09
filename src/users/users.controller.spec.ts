@@ -15,6 +15,8 @@ describe('UsersController', () => {
             updateUser: jest.fn(),
             getMedicalInfo: jest.fn(),
             remove: jest.fn(),
+            findByEmail: jest.fn(),
+            getUserClubs: jest.fn(),
         } as unknown as jest.Mocked<UsersService>;
 
         const module: TestingModule = await Test.createTestingModule({

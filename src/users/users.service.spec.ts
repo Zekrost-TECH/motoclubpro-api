@@ -114,6 +114,19 @@ describe('UsersService', () => {
             expect(values[0]).not.toBe('newpass');
         });
 
+        it('should flatten nested emergencyContact into ec columns', async () => {
+            db.query.mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'A' }] });
+            await service.updateUser('u1', {
+                emergencyContact: { name: 'Jane', phone: '321', relationship: 'spouse' },
+            } as never);
+            const sql = db.query.mock.calls[0][0] as string;
+            const values = db.query.mock.calls[0][1] as unknown[];
+            expect(sql).toContain('ec_name');
+            expect(sql).toContain('ec_phone');
+            expect(sql).toContain('ec_relationship');
+            expect(values).toEqual(['Jane', '321', 'spouse', 'u1']);
+        });
+
         it('should return findOne result when no keys to update', async () => {
             db.query
                 .mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'A' }] })

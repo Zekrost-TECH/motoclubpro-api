@@ -145,6 +145,14 @@ export class UsersService {
     async updateUser(id: string, data: UpdateUserDto): Promise<User> {
         const typedData: Record<string, unknown> = { ...data };
 
+        if (typedData.emergencyContact && typeof typedData.emergencyContact === 'object') {
+            const ec = typedData.emergencyContact as Record<string, unknown>;
+            typedData.ecName = ec.name ?? typedData.ecName;
+            typedData.ecPhone = ec.phone ?? typedData.ecPhone;
+            typedData.ecRelationship = ec.relationship ?? typedData.ecRelationship;
+            delete typedData.emergencyContact;
+        }
+
         if (typedData.passwordHash) {
             typedData.passwordHash = await bcrypt.hash(typedData.passwordHash as string, 10);
             typedData.password_hash = typedData.passwordHash;

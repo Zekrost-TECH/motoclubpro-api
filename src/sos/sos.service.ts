@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { Redis } from 'ioredis';
 import { CreateSosDto } from './dto/create-sos.dto';
@@ -16,6 +16,13 @@ export class SosService {
     // El controller llama a este método: sosService.create(userId, dto, clubId)
     async create(userId: string, data: CreateSosDto, clubId?: string): Promise<SosAlertSummary> {
         const { type, lat, lng, event_id, description } = data;
+
+        // Seguridad: un SOS sin club ni rodada activa no puede enviarse a nadie.
+        // Sin esta validación, la query de FCM cae sin filtro de club/evento y
+        // notifica a todos los usuarios del sistema.
+        if (!clubId && !event_id) {
+            throw new BadRequestException('No se puede enviar una alerta SOS sin un club o rodada activa.');
+        }
 
         // Insertar en BD con PostGIS — ST_MakePoint(lng, lat)
         const insertResult = await this.rawDb.query<{ id: string }>(`
