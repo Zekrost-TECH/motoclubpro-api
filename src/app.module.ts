@@ -20,6 +20,7 @@ import { PlansModule } from './plans/plans.module';
 import { ReportsModule } from './reports/reports.module';
 import { ClubsModule } from './clubs/clubs.module';
 import { HealthModule } from './health/health.module';
+import { TrackerModule } from './tracker/tracker.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { HealthModule } from './health/health.module';
     ReportsModule,
     HealthModule,
     ClubsModule,
+    TrackerModule,
   ],
   providers: [
     {
