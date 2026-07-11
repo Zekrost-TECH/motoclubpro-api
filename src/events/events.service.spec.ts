@@ -168,11 +168,8 @@ describe('EventsService', () => {
     describe('updateStatus', () => {
         it('should update event status', async () => {
             const draftEvent = { ...mockEvent, status: 'borrador' };
-            dbQueryMock
-                .mockResolvedValueOnce({ rows: [draftEvent] })
-                .mockResolvedValueOnce({ rows: [] })
-                .mockResolvedValueOnce({ rows: [] })
-                .mockResolvedValueOnce({ rows: [{ ...draftEvent, status: 'proximo' }] });
+            jest.spyOn(service, 'findOne').mockResolvedValue(draftEvent as any);
+            dbQueryMock.mockResolvedValueOnce({ rows: [{ ...draftEvent, status: 'proximo' }] });
 
             const result = await service.updateStatus('event-1', 'proximo');
             expect(result.status).toBe('proximo');
@@ -180,10 +177,7 @@ describe('EventsService', () => {
 
         it('should throw BadRequestException for invalid transition', async () => {
             const completedEvent = { ...mockEvent, status: 'completado' };
-            dbQueryMock
-                .mockResolvedValueOnce({ rows: [completedEvent] })
-                .mockResolvedValueOnce({ rows: [] })
-                .mockResolvedValueOnce({ rows: [] });
+            jest.spyOn(service, 'findOne').mockResolvedValue(completedEvent as any);
 
             await expect(service.updateStatus('event-1', 'cancelado')).rejects.toThrow(BadRequestException);
         });
@@ -285,8 +279,10 @@ describe('EventsService', () => {
     });
 
     describe('cancelRsvp', () => {
-        it('should cancel RSVP', async () => {
-            dbQueryMock.mockResolvedValueOnce({ rows: [{ id: 'rsvp-1' }] });
+        it('should cancel RSVP and remove guests of the rider', async () => {
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [{ id: 'rsvp-1' }] }) // DELETE event_attendees
+                .mockResolvedValueOnce({ rows: [] }); // DELETE event_guests (cascada al desinscribir)
             const result = await service.cancelRsvp('event-1', 'user-1');
             expect(result.deleted).toBe(true);
         });
@@ -294,6 +290,93 @@ describe('EventsService', () => {
         it('should throw NotFoundException when RSVP not found', async () => {
             dbQueryMock.mockResolvedValueOnce({ rows: [] });
             await expect(service.cancelRsvp('event-1', 'user-1')).rejects.toThrow(NotFoundException);
+        });
+    });
+
+    describe('getGuests', () => {
+        it('should return guests for an event', async () => {
+            const guest = { id: 'g1', event_id: 'event-1', invited_by: 'u1', guest_type: 'acompañante', full_name: 'Ana' };
+            dbQueryMock.mockResolvedValueOnce({ rows: [guest] });
+            const result = await service.getGuests('event-1');
+            expect(result).toHaveLength(1);
+            expect(result[0].full_name).toBe('Ana');
+        });
+    });
+
+    describe('addGuest', () => {
+        it('should add a guest when the rider is attending', async () => {
+            const guest = { id: 'g1', event_id: 'event-1', invited_by: 'u1', guest_type: 'invitado', full_name: 'Luis' };
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [{ '1': 1 }] }) // check attendee exists
+                .mockResolvedValueOnce({ rows: [guest] }); // INSERT
+            const result = await service.addGuest('event-1', 'u1', {
+                guest_type: 'invitado', full_name: 'Luis',
+            } as any);
+            expect(result.full_name).toBe('Luis');
+        });
+
+        it('should throw BadRequestException when rider is not attending', async () => {
+            dbQueryMock.mockResolvedValueOnce({ rows: [] }); // attendee not found
+            await expect(service.addGuest('event-1', 'u1', {
+                guest_type: 'invitado', full_name: 'Luis',
+            } as any)).rejects.toThrow(BadRequestException);
+        });
+
+        it('should throw ConflictException when acompañante already exists (23505)', async () => {
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [{ '1': 1 }] }) // attendee exists
+                .mockRejectedValueOnce({ code: '23505' }); // insert violation
+            await expect(service.addGuest('event-1', 'u1', {
+                guest_type: 'acompañante', full_name: 'Ana',
+            } as any)).rejects.toThrow(ConflictException);
+        });
+    });
+
+    describe('updateGuest', () => {
+        it('should update a guest owned by the rider', async () => {
+            const existing = { id: 'g1', event_id: 'event-1', invited_by: 'u1', full_name: 'Ana' };
+            const updated = { ...existing, full_name: 'Ana M' };
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [existing] }) // SELECT existing
+                .mockResolvedValueOnce({ rows: [updated] }); // UPDATE
+            const result = await service.updateGuest('event-1', 'g1', 'u1', { full_name: 'Ana M' });
+            expect(result.full_name).toBe('Ana M');
+        });
+
+        it('should return the guest unchanged when dto is empty', async () => {
+            const existing = { id: 'g1', event_id: 'event-1', invited_by: 'u1', full_name: 'Ana' };
+            dbQueryMock.mockResolvedValueOnce({ rows: [existing] });
+            const result = await service.updateGuest('event-1', 'g1', 'u1', {});
+            expect(result.full_name).toBe('Ana');
+        });
+
+        it('should throw NotFoundException when guest does not exist', async () => {
+            dbQueryMock.mockResolvedValueOnce({ rows: [] });
+            await expect(service.updateGuest('event-1', 'g1', 'u1', { full_name: 'X' })).rejects.toThrow(NotFoundException);
+        });
+
+        it('should throw BadRequestException when not the owner and not admin/leader', async () => {
+            const existing = { id: 'g1', event_id: 'event-1', invited_by: 'other-user', full_name: 'Ana' };
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [existing] }) // SELECT existing
+                .mockResolvedValueOnce({ rows: [{ role: 'rider' }] }); // check user role
+            await expect(service.updateGuest('event-1', 'g1', 'u1', { full_name: 'X' })).rejects.toThrow(BadRequestException);
+        });
+    });
+
+    describe('removeGuest', () => {
+        it('should remove a guest owned by the rider', async () => {
+            const existing = { id: 'g1', event_id: 'event-1', invited_by: 'u1', full_name: 'Ana' };
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [existing] }) // SELECT existing
+                .mockResolvedValueOnce({ rows: [] }); // DELETE
+            const result = await service.removeGuest('event-1', 'g1', 'u1');
+            expect(result.deleted).toBe(true);
+        });
+
+        it('should throw NotFoundException when guest does not exist', async () => {
+            dbQueryMock.mockResolvedValueOnce({ rows: [] });
+            await expect(service.removeGuest('event-1', 'g1', 'u1')).rejects.toThrow(NotFoundException);
         });
     });
 

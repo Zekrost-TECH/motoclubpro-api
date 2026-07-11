@@ -3,6 +3,7 @@ export type RiderLevel = 'novato' | 'basico' | 'intermedio' | 'avanzado' | 'expe
 export type RideRole = string;
 export type InventoryCategory = 'herramienta' | 'seguridad' | 'comida' | 'otros';
 export type RouteDifficulty = 'suave' | 'moderada' | 'expertos' | 'off_road' | 'viaje_largo';
+export type GuestType = 'acompañante' | 'invitado';
 
 export interface Event {
     id: string;
@@ -29,6 +30,18 @@ export interface EventAttendee {
     ride_role: RideRole;
     checklist_completed: boolean;
     confirmed_at?: Date;
+}
+
+export interface EventGuest {
+    id: string;
+    event_id?: string;
+    invited_by: string;
+    guest_type: GuestType;
+    full_name: string;
+    phone?: string;
+    notes?: string;
+    confirmed_at?: string;
+    created_at?: string;
 }
 
 export interface InventoryItem {

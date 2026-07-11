@@ -11,7 +11,9 @@ import { DatabaseService } from '../database/database.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
-import { RideRole } from './events.types';
+import { CreateEventGuestDto } from './dto/create-event-guest.dto';
+import { UpdateEventGuestDto } from './dto/update-event-guest.dto';
+import { RideRole, GuestType } from './events.types';
 import { RideRolesService } from '../ride-roles/ride-roles.service';
 import { PlansService } from '../plans/plans.service';
 import { UserRole } from '../users/users.types';
@@ -61,6 +63,19 @@ export interface ChecklistItemRow {
     event_id?: string;
     required: boolean;
     sort_order: number;
+}
+
+export interface GuestRow {
+    id: string;
+    event_id: string;
+    invited_by: string;
+    guest_type: GuestType;
+    full_name: string;
+    phone?: string;
+    notes?: string;
+    confirmed_at?: string;
+    created_at?: string;
+    inviter_name?: string;
 }
 
 interface CountRow {
@@ -218,9 +233,10 @@ export class EventsService {
 
         await Promise.all(
             res.rows.map(async (event) => {
-                const ev = event as EventRow & { attendees?: unknown; inventory?: unknown };
+                const ev = event as EventRow & { attendees?: unknown; inventory?: unknown; guests?: unknown };
                 ev.attendees = await this.getAttendees(event.id, clubId);
                 ev.inventory = await this.getInventory(event.id, clubId);
+                ev.guests = await this.getGuests(event.id, clubId);
             }),
         );
 
@@ -231,7 +247,7 @@ export class EventsService {
         };
     }
 
-    async findOne(id: string, clubId?: string): Promise<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[] }> {
+    async findOne(id: string, clubId?: string): Promise<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }> {
         let query = 'SELECT * FROM events WHERE id = $1';
         const params: (string | null)[] = [id];
         if (clubId) {
@@ -242,14 +258,15 @@ export class EventsService {
         if (!res.rows[0]) throw new NotFoundException('Event not found');
 
         const event = res.rows[0];
-        (event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[] }).attendees = await this.getAttendees(id, clubId);
-        (event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[] }).inventory = await this.getInventory(id, clubId);
+        (event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }).attendees = await this.getAttendees(id, clubId);
+        (event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }).inventory = await this.getInventory(id, clubId);
+        (event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }).guests = await this.getGuests(id, clubId);
 
         // Sincronizar autorización del tracker con la fuente de verdad (BD).
         // Esto recupera asistentes añadidos manualmente en DB y repara drift.
         await this.syncTrackerAuth(event.id, event.club_id ?? null);
 
-        return event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[] };
+        return event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] };
     }
 
     async update(id: string, updateEventDto: UpdateEventDto, clubId?: string): Promise<EventRow> {
@@ -433,6 +450,12 @@ export class EventsService {
             [eventId, userId],
         );
         if (!res.rows[0]) throw new NotFoundException('RSVP not found');
+
+        // Eliminar los invitados registrados por este piloto para que no queden huérfanos.
+        await this.db.query(
+            'DELETE FROM event_guests WHERE event_id = $1 AND invited_by = $2',
+            [eventId, userId],
+        );
 
         // Revocar la autorización del rider en el tracker.
         await this.safeRedis(
@@ -627,6 +650,126 @@ export class EventsService {
         await this.verifyEventClub(eventId, clubId);
         const res = await this.db.query<InventoryRow>('DELETE FROM inventory_items WHERE id = $1 AND event_id = $2 RETURNING *', [itemId, eventId]);
         if (!res.rows[0]) throw new NotFoundException('Item not found');
+        return { deleted: true };
+    }
+
+    // --- GUESTS LOGIC (acompañantes e invitados sin cuenta) ---
+    async getGuests(eventId: string, clubId?: string): Promise<GuestRow[]> {
+        await this.verifyEventClub(eventId, clubId);
+        const res = await this.db.query<GuestRow>(
+            `SELECT g.id, g.event_id, g.invited_by, g.guest_type, g.full_name,
+                    g.phone, g.notes, g.confirmed_at, g.created_at,
+                    u.name AS inviter_name
+             FROM event_guests g
+             LEFT JOIN users u ON u.id = g.invited_by
+             WHERE g.event_id = $1
+             ORDER BY g.created_at ASC`,
+            [eventId],
+        );
+        return res.rows;
+    }
+
+    async addGuest(eventId: string, userId: string, dto: CreateEventGuestDto, clubId?: string): Promise<GuestRow> {
+        await this.verifyEventClub(eventId, clubId);
+
+        // El piloto debe estar inscrito al evento para poder invitar.
+        const attending = await this.db.query<{ '1': number }>(
+            'SELECT 1 FROM event_attendees WHERE event_id = $1 AND user_id = $2',
+            [eventId, userId],
+        );
+        if (attending.rows.length === 0) {
+            throw new BadRequestException('Debes confirmar tu asistencia antes de invitar acompañantes');
+        }
+
+        try {
+            const res = await this.db.query<GuestRow>(
+                `INSERT INTO event_guests (event_id, invited_by, guest_type, full_name, phone, notes)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 RETURNING *`,
+                [eventId, userId, dto.guest_type, dto.full_name, dto.phone ?? null, dto.notes ?? null],
+            );
+            return res.rows[0];
+        } catch (e: unknown) {
+            const err = e as { code?: string };
+            // 23505: unique violation (event_id, full_name) o partial index idx_one_acompanante_per_rider
+            if (err.code === '23505') {
+                if (dto.guest_type === 'acompañante') {
+                    throw new ConflictException('Ya tienes un acompañante en este evento');
+                }
+                throw new ConflictException('Ya existe un invitado con ese nombre en este evento');
+            }
+            throw e;
+        }
+    }
+
+    async updateGuest(eventId: string, guestId: string, userId: string, dto: UpdateEventGuestDto, clubId?: string): Promise<GuestRow> {
+        await this.verifyEventClub(eventId, clubId);
+        const existing = await this.db.query<GuestRow>(
+            'SELECT * FROM event_guests WHERE id = $1 AND event_id = $2',
+            [guestId, eventId],
+        );
+        if (!existing.rows[0]) throw new NotFoundException('Guest not found');
+
+        // Solo el piloto que lo invitó (o un admin/leader) puede editarlo.
+        const guest = existing.rows[0];
+        const isOwner = guest.invited_by === userId;
+
+        if (!isOwner) {
+            // Verificar si es admin/leader del club
+            const userRes = await this.db.query<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
+            const role = userRes.rows[0]?.role;
+            if (role !== 'admin' && role !== 'leader' && role !== 'superadmin') {
+                throw new BadRequestException('No tienes permisos para editar este invitado');
+            }
+        }
+
+        const keys: string[] = [];
+        const values: unknown[] = [];
+        if (dto.full_name !== undefined) { keys.push('full_name'); values.push(dto.full_name); }
+        if (dto.phone !== undefined) { keys.push('phone'); values.push(dto.phone || null); }
+        if (dto.notes !== undefined) { keys.push('notes'); values.push(dto.notes || null); }
+        if (dto.guest_type !== undefined) { keys.push('guest_type'); values.push(dto.guest_type); }
+
+        if (keys.length === 0) return guest;
+
+        const setClauses = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+        values.push(guestId, eventId);
+
+        try {
+            const res = await this.db.query<GuestRow>(
+                `UPDATE event_guests SET ${setClauses} WHERE id = $${values.length - 1} AND event_id = $${values.length} RETURNING *`,
+                values,
+            );
+            return res.rows[0];
+        } catch (e: unknown) {
+            const err = e as { code?: string };
+            if (err.code === '23505') {
+                throw new ConflictException('Ya existe un invitado con ese nombre en este evento');
+            }
+            throw e;
+        }
+    }
+
+    async removeGuest(eventId: string, guestId: string, userId: string, clubId?: string): Promise<{ deleted: boolean }> {
+        await this.verifyEventClub(eventId, clubId);
+        const existing = await this.db.query<GuestRow>(
+            'SELECT * FROM event_guests WHERE id = $1 AND event_id = $2',
+            [guestId, eventId],
+        );
+        if (!existing.rows[0]) throw new NotFoundException('Guest not found');
+
+        const guest = existing.rows[0];
+        const isOwner = guest.invited_by === userId;
+
+        if (!isOwner) {
+            const userRes = await this.db.query<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
+            const role = userRes.rows[0]?.role;
+            if (role !== 'admin' && role !== 'leader' && role !== 'superadmin') {
+                throw new BadRequestException('No tienes permisos para eliminar este invitado');
+            }
+        }
+
+        await this.db.query('DELETE FROM event_guests WHERE id = $1 AND event_id = $2', [guestId, eventId]);
         return { deleted: true };
     }
 }

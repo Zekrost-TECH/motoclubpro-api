@@ -12,13 +12,15 @@ import {
     Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { EventsService, type EventRow, type AttendeeRow, type InventoryRow, type ChecklistItemRow } from './events.service';
+import { EventsService, type EventRow, type AttendeeRow, type InventoryRow, type ChecklistItemRow, type GuestRow } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { UpdateEventStatusDto } from './dto/update-event-status.dto';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { CreateChecklistItemDto } from './dto/create-checklist-item.dto';
 import { UpdateAttendeeRoleDto } from './dto/update-attendee-role.dto';
+import { CreateEventGuestDto } from './dto/create-event-guest.dto';
+import { UpdateEventGuestDto } from './dto/update-event-guest.dto';
 import { FindEventsQueryDto } from './dto/find-events-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { EventCaptainGuard } from './guards/event-captain.guard';
@@ -46,7 +48,7 @@ export class EventsController {
     }
 
     @Get(':id')
-    findOne(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[] }> {
+    findOne(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }> {
         return this.eventsService.findOne(id, clubId);
     }
 
@@ -174,5 +176,42 @@ export class EventsController {
     @ClubRoles(UserRole.admin, UserRole.leader)
     removeInventoryItem(@Param('id') id: string, @Param('itemId') itemId: string, @CurrentClub() clubId?: string): Promise<{ deleted: boolean }> {
         return this.eventsService.removeInventoryItem(id, itemId, clubId);
+    }
+
+    // --- GUESTS (acompañantes e invitados sin cuenta) ---
+    @Get(':id/guests')
+    getGuests(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<GuestRow[]> {
+        return this.eventsService.getGuests(id, clubId);
+    }
+
+    @Post(':id/guests')
+    addGuest(
+        @Param('id') id: string,
+        @Request() req: AuthRequest,
+        @Body() dto: CreateEventGuestDto,
+        @CurrentClub() clubId?: string,
+    ): Promise<GuestRow> {
+        return this.eventsService.addGuest(id, req.user.id, dto, clubId);
+    }
+
+    @Patch(':id/guests/:guestId')
+    updateGuest(
+        @Param('id') id: string,
+        @Param('guestId') guestId: string,
+        @Request() req: AuthRequest,
+        @Body() dto: UpdateEventGuestDto,
+        @CurrentClub() clubId?: string,
+    ): Promise<GuestRow> {
+        return this.eventsService.updateGuest(id, guestId, req.user.id, dto, clubId);
+    }
+
+    @Delete(':id/guests/:guestId')
+    removeGuest(
+        @Param('id') id: string,
+        @Param('guestId') guestId: string,
+        @Request() req: AuthRequest,
+        @CurrentClub() clubId?: string,
+    ): Promise<{ deleted: boolean }> {
+        return this.eventsService.removeGuest(id, guestId, req.user.id, clubId);
     }
 }
