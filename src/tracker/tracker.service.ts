@@ -27,9 +27,11 @@ export class TrackerService {
     }
 
     private positionTTL(): number {
-        // 30 segundos por defecto, igual que el tracker Go
+        // 90 segundos por defecto: en carretera la señal se cae con frecuencia.
+        // Un TTL de 30s hacía que un rider desapareciera del radar tras un
+        // breve túnel o zona sin cobertura, aunque siguiera rodando.
         const ttl = parseInt(process.env.POSITION_TTL_SEC ?? '', 10);
-        return Number.isNaN(ttl) ? 30 : ttl;
+        return Number.isNaN(ttl) ? 90 : ttl;
     }
 
     /**
@@ -53,26 +55,31 @@ export class TrackerService {
             throw new ForbiddenException('El evento no está en curso');
         }
 
-        // 2. Verificar que el usuario es asistente del evento o admin/líder del club
-        const attendeeRes = await this.db.query(
-            `SELECT 1 FROM event_attendees WHERE event_id = $1 AND user_id = $2 LIMIT 1`,
+        // 2. Verificar que el usuario es asistente del evento o admin/líder del club.
+        // También recuperamos su ride_role operativo (puntero, barredora, ...)
+        // para que el radar muestre el rol real de la rodada, no el rol del
+        // sistema (admin/leader/rider).
+        const attendeeRes = await this.db.query<{ ride_role: string }>(
+            `SELECT ride_role FROM event_attendees WHERE event_id = $1 AND user_id = $2 LIMIT 1`,
             [eventId, user.id],
         );
-        const isAttendee = attendeeRes.rows.length > 0;
+        const attendee = attendeeRes.rows[0];
+        const isAttendee = !!attendee;
         const isManager = user.role === 'admin' || user.role === 'leader' || user.role === 'superadmin';
-        // Opcional: verificar que el admin/líder pertenezca al club del evento
         if (!isAttendee && !isManager) {
             throw new UnauthorizedException('No estás autorizado para este evento');
         }
 
-        // 3. Construir payload igual que el tracker Go
+        // 3. Construir payload igual que el tracker Go.
+        // role = rol operativo de la rodada; un manager que no es asistente
+        // cae al fallback de su rol del sistema.
         const status: RiderStatus = {
             lat,
             lng,
             speed: speed ?? 0,
             heading: heading ?? 0,
             timestamp: timestamp ?? Date.now(),
-            role: user.role,
+            role: attendee?.ride_role ?? user.role,
             userId: user.id,
             name: name ?? '',
         };

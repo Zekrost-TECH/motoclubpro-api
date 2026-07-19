@@ -68,7 +68,7 @@ services:
       JWT_EXPIRES_IN: 15m
       REFRESH_SECRET: dev_refresh_secret_change_in_production
       REFRESH_EXPIRES_IN: 30d
-      ALLOWED_ORIGINS: "http://localhost,http://localhost:5173,http://localhost:13000,http://localhost:3001,capacitor://localhost,https://localhost,http://10.0.2.2:13000"
+      ALLOWED_ORIGINS: "http://localhost,http://localhost:5173,http://localhost:13000,http://localhost:3001,capacitor://localhost,https://localhost,http://10.0.2.2:13000,http://10.0.2.2:5173"
       # Dummy values for E2E — billing/payment flows are not exercised
       WOMPI_PUBLIC_KEY: pub_test_dummy
       WOMPI_PRIVATE_KEY: prv_test_dummy
