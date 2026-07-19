@@ -81,6 +81,20 @@ export class UsersService {
         };
     }
 
+    private async computeUserStats(userId: string): Promise<{ ridesCompleted: number; totalKm: number }> {
+        const { rows } = await this.db.query<{ ridesCompleted: number; totalKm: number }>(
+            `SELECT
+                COUNT(ea.event_id)::int AS "ridesCompleted",
+                COALESCE(SUM(r.distance_km), 0)::numeric AS "totalKm"
+             FROM event_attendees ea
+             JOIN events e ON e.id = ea.event_id
+             LEFT JOIN routes r ON r.id = e.route_id
+             WHERE ea.user_id = $1 AND e.status = 'completado'`,
+            [userId],
+        );
+        return rows[0] ?? { ridesCompleted: 0, totalKm: 0 };
+    }
+
     async findOne(id: string): Promise<User & { motorcycle?: unknown; userPositions?: unknown }> {
         const { rows: userRows } = await this.db.query<User>(`
             SELECT
@@ -88,7 +102,7 @@ export class UsersService {
                 role, rider_level AS "riderLevel", password_hash AS "passwordHash", fcm_token,
                 blood_type AS "bloodType", allergies, medical_conditions AS "medicalConditions",
                 ec_name AS "ecName", ec_phone AS "ecPhone", ec_relationship AS "ecRelationship",
-                join_date AS "joinDate", rides_completed AS "ridesCompleted", total_km AS "totalKm", is_active AS "isActive"
+                join_date AS "joinDate", is_active AS "isActive"
             FROM users WHERE id = $1
         `, [id]);
 
@@ -97,6 +111,11 @@ export class UsersService {
         }
 
         const user = userRows[0] as User & { motorcycle?: unknown; userPositions?: unknown };
+
+        // Calcular estadísticas dinámicamente desde eventos completados
+        const stats = await this.computeUserStats(id);
+        user.ridesCompleted = stats.ridesCompleted;
+        user.totalKm = Number(stats.totalKm);
 
         const { rows: motorcycles } = await this.db.query<Record<string, unknown>>(`
             SELECT
@@ -131,15 +150,22 @@ export class UsersService {
 
     async findByEmail(email: string): Promise<User | null> {
         const { rows } = await this.db.query<User>(`
-            SELECT 
+            SELECT
                 id, name, nickname, email, phone, avatar_url, avatar_initials,
                 role, rider_level AS "riderLevel", password_hash AS "passwordHash", fcm_token,
                 blood_type AS "bloodType", allergies, medical_conditions AS "medicalConditions",
                 ec_name AS "ecName", ec_phone AS "ecPhone", ec_relationship AS "ecRelationship",
-                join_date AS "joinDate", rides_completed AS "ridesCompleted", total_km AS "totalKm", is_active AS "isActive"
+                join_date AS "joinDate", is_active AS "isActive"
             FROM users WHERE email = $1 LIMIT 1
         `, [email]);
-        return rows[0] || null;
+
+        const user = rows[0] || null;
+        if (user) {
+            const stats = await this.computeUserStats(user.id);
+            user.ridesCompleted = stats.ridesCompleted;
+            user.totalKm = Number(stats.totalKm);
+        }
+        return user;
     }
 
     async updateUser(id: string, data: UpdateUserDto): Promise<User> {

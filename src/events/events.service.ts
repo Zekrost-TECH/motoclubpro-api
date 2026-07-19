@@ -337,7 +337,42 @@ export class EventsService {
             await this.syncTrackerAuth(updated.id, updated.club_id ?? null);
         }
 
+        if (updated && newStatus === 'completado') {
+            // Obtener distancia de la ruta y actualizar estadísticas de attendees
+            await this._updateRiderStatsOnCompletion(updated.id, updated.route_id ?? null);
+        }
+
         return updated;
+    }
+
+    private async _updateRiderStatsOnCompletion(eventId: string, routeId: string | null): Promise<void> {
+        // Obtener distancia de la ruta (0 si no hay ruta)
+        let distanceKm = 0;
+        if (routeId) {
+            const { rows: routeRows } = await this.db.query<{ distance_km: number }>(
+                'SELECT distance_km FROM routes WHERE id = $1',
+                [routeId],
+            );
+            distanceKm = Number(routeRows[0]?.distance_km ?? 0);
+        }
+
+        // Obtener todos los asistentes al evento
+        const { rows: attendees } = await this.db.query<{ user_id: string }>(
+            'SELECT user_id FROM event_attendees WHERE event_id = $1',
+            [eventId],
+        );
+
+        // Actualizar estadísticas de cada rider
+        for (const attendee of attendees) {
+            await this.db.query(
+                `UPDATE users
+                 SET rides_completed = rides_completed + 1,
+                     total_km = total_km + $1,
+                     updated_at = NOW()
+                 WHERE id = $2`,
+                [distanceKm, attendee.user_id],
+            );
+        }
     }
 
     private async verifyEventClub(eventId: string, clubId?: string): Promise<void> {
