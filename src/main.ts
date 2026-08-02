@@ -77,10 +77,12 @@ async function bootstrap() {
     .filter(Boolean);
 
   // Capacitor Android/iOS sirve la WebView desde estos orígenes
+  // En desarrollo con Android Emulator, Capacitor carga desde el Vite dev server.
   const capacitorOrigins = new Set([
     'capacitor://localhost',
     'https://localhost',
     'http://localhost',
+    'http://10.0.2.2:5173',
   ]);
 
   app.enableCors({
