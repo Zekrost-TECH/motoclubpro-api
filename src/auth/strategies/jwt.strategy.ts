@@ -54,6 +54,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             throw new UnauthorizedException('User account is inactive');
         }
 
-        return { ...user, clubs: payload.clubs ?? [] };
+        // No confiar en los claims del token (pueden estar stale): resolver
+        // membresías vigentes desde BD en cada request, así la revocación
+        // de una membresía de club surte efecto inmediato.
+        const clubs = await this.usersService.getUserClubs(payload.sub);
+
+        return { ...user, clubs };
     }
 }

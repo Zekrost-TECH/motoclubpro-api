@@ -26,6 +26,7 @@ describe('ClubsController', () => {
                         findBySlug: jest.fn().mockResolvedValue(mockClub),
                         findMembers: jest.fn().mockResolvedValue({ data: [mockMember], meta: { total: 1, page: 1, limit: 20, totalPages: 1 } }),
                         inviteMember: jest.fn().mockResolvedValue(undefined),
+                        removeMember: jest.fn().mockResolvedValue(undefined),
                         updateBillingInfo: jest.fn().mockResolvedValue(undefined),
                         getSubscription: jest.fn().mockResolvedValue(mockSubscription),
                     },
@@ -90,6 +91,14 @@ describe('ClubsController', () => {
             const result = await controller.inviteMember('club-1', dto, req);
             expect(result).toEqual({ ok: true });
             expect(service.inviteMember).toHaveBeenCalledWith('club-1', undefined, 'new@user.com', 'rider', req.user);
+        });
+    });
+
+    describe('removeMember', () => {
+        it('should remove a member from the club', async () => {
+            const result = await controller.removeMember('club-1', 'user-2');
+            expect(result).toEqual({ ok: true });
+            expect(service.removeMember).toHaveBeenCalledWith('club-1', 'user-2');
         });
     });
 

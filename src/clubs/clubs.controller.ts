@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Request,
@@ -63,6 +64,14 @@ export class ClubsController {
   @ClubRoles(UserRole.admin, UserRole.leader)
   async inviteMember(@Param('id') clubId: string, @Body() dto: InviteMemberDto, @Request() req: AuthRequest): Promise<{ ok: boolean }> {
     await this.clubsService.inviteMember(clubId, dto.userId, dto.email, dto.role || 'rider', req.user);
+    return { ok: true };
+  }
+
+  @Delete(':id/members/:userId')
+  @UseGuards(ClubMemberGuard, ClubMemberRolesGuard)
+  @ClubRoles(UserRole.admin)
+  async removeMember(@Param('id') clubId: string, @Param('userId') userId: string): Promise<{ ok: boolean }> {
+    await this.clubsService.removeMember(clubId, userId);
     return { ok: true };
   }
 
