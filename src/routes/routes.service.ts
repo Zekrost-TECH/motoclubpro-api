@@ -207,19 +207,47 @@ export class RoutesService {
     async addBatchWaypoints(routeId: string, geojson: unknown, clubId?: string): Promise<void> {
         await this.verifyRouteClub(routeId, clubId);
         const g = geojson as { type?: string; features?: Array<{ geometry?: unknown; properties?: Record<string, unknown> }> };
-        if (g && g.type === 'FeatureCollection' && Array.isArray(g.features)) {
+        if (!(g && g.type === 'FeatureCollection' && Array.isArray(g.features))) {
+            return;
+        }
+
+        const client = await this.db.getPool().connect();
+        try {
+            await client.query('BEGIN');
+            // Reemplazo completo: ambos clientes (web edit + app offline upload)
+            // envían la lista completa de waypoints de la ruta. Sin el DELETE,
+            // cada guardado duplicaba los waypoints existentes.
+            await client.query('DELETE FROM route_waypoints WHERE route_id = $1', [routeId]);
+
             for (const [index, feature] of g.features.entries()) {
                 const geom = feature.geometry as { type?: string; coordinates?: [number, number] } | undefined;
-                if (geom && geom.type === 'Point' && geom.coordinates) {
-                    await this.addWaypoint(routeId, {
-                        location: { type: 'Point', coordinates: geom.coordinates },
-                        type: (feature.properties?.type as string) || 'parada',
-                        name: (feature.properties?.name as string) || `WP ${index + 1}`,
-                        sortOrder: feature.properties?.sortOrder !== undefined ? (feature.properties.sortOrder as number) : index,
-                        notes: (feature.properties?.notes as string) || undefined,
-                    } as CreateWaypointDto, clubId);
+                if (!(geom && geom.type === 'Point' && geom.coordinates)) {
+                    continue;
                 }
+                await client.query(
+                    `INSERT INTO route_waypoints (
+                        id, route_id, name, location, type, estimated_arrival, notes, sort_order
+                    ) VALUES (
+                        gen_random_uuid(), $1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326), $4, $5, $6, $7
+                    )`,
+                    [
+                        routeId,
+                        (feature.properties?.name as string) || `WP ${index + 1}`,
+                        JSON.stringify({ type: 'Point', coordinates: geom.coordinates }),
+                        (feature.properties?.type as string) || 'parada',
+                        null,
+                        (feature.properties?.notes as string) || undefined,
+                        feature.properties?.sortOrder !== undefined ? (feature.properties.sortOrder as number) : index,
+                    ],
+                );
             }
+
+            await client.query('COMMIT');
+        } catch (e) {
+            await client.query('ROLLBACK').catch(() => { });
+            throw e;
+        } finally {
+            client.release();
         }
     }
 }
