@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ClubsService } from './clubs.service';
-import type { ClubRow, MemberRow, SubscriptionRow } from './clubs.service';
+import type { ClubRow, PublicClubRow, MemberRow, SubscriptionRow } from './clubs.service';
 import { CreateClubDto } from './dto/create-club.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
@@ -44,7 +44,7 @@ export class ClubsController {
   }
 
   @Get(':slug')
-  async findBySlug(@Param('slug') slug: string): Promise<ClubRow> {
+  async findBySlug(@Param('slug') slug: string): Promise<PublicClubRow> {
     const club = await this.clubsService.findBySlug(slug);
     if (!club) {
       throw new NotFoundException('Club not found');

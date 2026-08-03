@@ -65,6 +65,14 @@ describe('ClubsService', () => {
             const result = await service.findBySlug('test');
             expect(result?.name).toBe('Test');
         });
+
+        it('should not select DIAN/billing fields in the query', async () => {
+            db.query.mockResolvedValueOnce({ rows: [{ id: 'club-1', name: 'Test' }] });
+            const result = await service.findBySlug('test');
+            const sql = db.query.mock.calls[0][0] as string;
+            expect(result).toBeDefined();
+            expect(sql).not.toMatch(/nit|billing_address|billing_phone|billing_contact|tax_regime/);
+        });
     });
 
     describe('findMembers', () => {

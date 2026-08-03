@@ -27,6 +27,11 @@ export interface ClubRow {
   created_at: Date;
 }
 
+export type PublicClubRow = Omit<
+  ClubRow,
+  'nit' | 'billing_address' | 'billing_phone' | 'billing_contact_name' | 'billing_contact_email' | 'tax_regime'
+>;
+
 export interface MemberRow {
   id: string;
   user_id: string;
@@ -120,11 +125,9 @@ export class ClubsService {
     }
   }
 
-  async findBySlug(slug: string): Promise<ClubRow | null> {
-    const { rows } = await this.db.query<ClubRow>(
-      `SELECT id, name, slug, logo_url, city, department, description, nit,
-              billing_address, billing_phone, billing_contact_name,
-              billing_contact_email, tax_regime, is_active, created_at
+  async findBySlug(slug: string): Promise<PublicClubRow | null> {
+    const { rows } = await this.db.query<PublicClubRow>(
+      `SELECT id, name, slug, logo_url, city, department, description, is_active, created_at
        FROM clubs
        WHERE slug = $1 AND is_active = TRUE`,
       [slug],
