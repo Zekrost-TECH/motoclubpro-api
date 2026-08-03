@@ -9,6 +9,7 @@ import {
     UseGuards,
     Request,
     Query,
+    ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -41,7 +42,10 @@ export class UsersController {
 
     @Get()
     @Roles(UserRole.admin, UserRole.leader, UserRole.rider)
-    findAll(@CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: User[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+    findAll(@Request() req: AuthRequest, @CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: User[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+        if (!clubId && req.user.role !== UserRole.superadmin && req.user.role !== UserRole.admin) {
+            throw new ForbiddenException('Se requiere un club activo (x-club-id) para listar usuarios');
+        }
         return this.usersService.findAll(clubId, pagination?.page, pagination?.limit);
     }
 

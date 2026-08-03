@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -48,9 +49,21 @@ describe('UsersController', () => {
     describe('findAll', () => {
         it('should return users filtered by club', async () => {
             usersService.findAll.mockResolvedValue({ data: [{ id: 'u1', name: 'A' }], meta: { total: 1, page: 1, limit: 20, totalPages: 1 } } as never);
-            const result = await controller.findAll('club-1');
+            const result = await controller.findAll(mockReq as never, 'club-1');
             expect(result.data).toHaveLength(1);
             expect(usersService.findAll).toHaveBeenCalledWith('club-1', undefined, undefined);
+        });
+
+        it('should throw ForbiddenException when no club and user is not admin', () => {
+            const riderReq = { user: { id: 'u1', email: 'a@b.com', role: UserRole.rider } };
+            expect(() => controller.findAll(riderReq as never)).toThrow(ForbiddenException);
+        });
+
+        it('should allow platform-wide listing for global admin', async () => {
+            usersService.findAll.mockResolvedValue({ data: [{ id: 'u1', name: 'A' }], meta: { total: 1, page: 1, limit: 20, totalPages: 1 } } as never);
+            const result = await controller.findAll(mockReq as never);
+            expect(result.data).toHaveLength(1);
+            expect(usersService.findAll).toHaveBeenCalledWith(undefined, undefined, undefined);
         });
     });
 
