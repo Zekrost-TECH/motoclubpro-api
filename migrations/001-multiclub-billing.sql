@@ -17,16 +17,17 @@ CREATE TABLE clubs (
   city              VARCHAR(100),
   department        VARCHAR(100),
   -- Billing / DIAN data
-  nit               VARCHAR(20),
+  nit               VARCHAR(50),
   billing_address   TEXT,
   billing_phone     VARCHAR(30),
   billing_contact_name    VARCHAR(120),
   billing_contact_email   VARCHAR(200),
-  tax_regime        VARCHAR(20),   -- simplificado | comun | no_responsable
+  tax_regime        VARCHAR(30) DEFAULT 'simplificado', -- simplificado | comun | no_responsable
   -- Wompi default
   wompi_customer_email    TEXT,
   wompi_payment_source_id TEXT,
   wompi_payment_method_type VARCHAR(20), -- CARD | NEQUI | PSE | BANCOLOMBIA
+  plan_id           VARCHAR(50) DEFAULT 'prueba',
   -- Metadata
   is_active         BOOLEAN DEFAULT TRUE,
   created_at        TIMESTAMPTZ DEFAULT NOW(),

@@ -16,14 +16,6 @@ DECLARE
     v_plan_id          VARCHAR(20) := 'empresarial';
     v_subscription_id  UUID;
 BEGIN
-    -- ── 0. ASEGURAR COLUMNAS QUE FALTAN EN INIT.SQL ──────────────────────────
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'clubs' AND column_name = 'plan_id'
-    ) THEN
-        ALTER TABLE clubs ADD COLUMN plan_id VARCHAR(50) DEFAULT 'prueba';
-    END IF;
-
     -- ── 1. CARGOS DEL CLUB ───────────────────────────────────────────────────
     INSERT INTO club_positions (name, icon, sort_order) VALUES
         ('Presidente', '👑', 1),
