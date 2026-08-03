@@ -84,26 +84,4 @@ describe('WompiService', () => {
             await expect(service.createTransaction(dto)).rejects.toThrow(HttpException);
         });
     });
-
-    describe('getTransaction', () => {
-        it('should fetch a transaction by id', async () => {
-            fetchMock.mockResolvedValueOnce({
-                ok: true,
-                json: jest.fn().mockResolvedValue({ data: { id: 'tx-1', status: 'APPROVED', reference: 'MCP-ref-1' } }),
-            });
-
-            const result = await service.getTransaction('tx-1');
-            expect(result.data.status).toBe('APPROVED');
-        });
-
-        it('should throw HttpException when fetch fails', async () => {
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 404,
-                json: jest.fn().mockResolvedValue({ error: 'not found' }),
-            });
-
-            await expect(service.getTransaction('tx-1')).rejects.toThrow(HttpException);
-        });
-    });
 });

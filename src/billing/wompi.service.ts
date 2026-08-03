@@ -48,22 +48,6 @@ export class WompiService {
     return (await res.json()) as WompiTransactionResponse;
   }
 
-  async getTransaction(transactionId: string): Promise<WompiTransactionResponse> {
-    const res = await fetch(`${this.baseUrl}/transactions/${transactionId}`, {
-      headers: {
-        Authorization: `Bearer ${this.publicKey}`,
-      },
-    });
-
-    if (!res.ok) {
-      const error = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      this.logger.error('Wompi get transaction failed', error);
-      throw new HttpException(error, res.status);
-    }
-
-    return (await res.json()) as WompiTransactionResponse;
-  }
-
   private async getAcceptanceToken(): Promise<string> {
     const res = await fetch(`${this.baseUrl}/merchants/${this.publicKey}`);
 
