@@ -11,6 +11,10 @@ import { TurnstileService } from '../src/turnstile/turnstile.service';
 
 const send = request as unknown as typeof import('supertest');
 
+// Si DATABASE_URL y REDIS_URL están presentes, el e2e ejercita BD y Redis
+// reales (integración). Si no, cae a mocks para poder correr sin infra.
+const useRealInfra = Boolean(process.env.DATABASE_URL && process.env.REDIS_URL);
+
 describe('Auth (e2e)', () => {
     let app: INestApplication;
     let dbQueryMock: jest.Mock;
@@ -19,8 +23,9 @@ describe('Auth (e2e)', () => {
 
     let passwordHash: string;
     const password = 'Password123';
+    const testEmail = 'rider@example.com';
 
-    // Mutable per-test fixtures
+    // Mutable per-test fixtures (solo aplican cuando la BD está mockeada)
     let existingEmailRows: unknown[] = [];
     let loginUserRows: unknown[] = [];
 
@@ -29,7 +34,7 @@ describe('Auth (e2e)', () => {
         name: 'New Rider',
         nickname: 'rider',
         email: 'rider@example.com',
-        role: 'piloto',
+        role: 'rider',
         riderLevel: 'novato',
         joinDate: new Date().toISOString(),
         isActive: true,
@@ -58,7 +63,7 @@ describe('Auth (e2e)', () => {
 
         turnstileVerifyMock = jest.fn().mockResolvedValue(true);
 
-        const moduleFixture: TestingModule = await Test.createTestingModule({
+        const moduleBuilder = Test.createTestingModule({
             imports: [
                 ConfigModule.forRoot({
                     isGlobal: true,
@@ -68,7 +73,7 @@ describe('Auth (e2e)', () => {
                         JWT_EXPIRES_IN: '15m',
                         REFRESH_SECRET: 'test-refresh-secret-32-chars-long',
                         REFRESH_EXPIRES_IN: '30d',
-                        REDIS_URL: 'redis://localhost:6379',
+                        REDIS_URL: process.env.REDIS_URL ?? 'redis://localhost:6379',
                     })],
                 }),
                 DatabaseModule,
@@ -76,20 +81,38 @@ describe('Auth (e2e)', () => {
                 AuthModule,
             ],
         })
-            .overrideProvider(DatabaseService)
-            .useValue({ query: dbQueryMock, getPool: jest.fn() })
-            .overrideProvider('REDIS_CLIENT')
-            .useValue(redisMock)
             .overrideProvider(TurnstileService)
-            .useValue({ verifyToken: turnstileVerifyMock })
-            .compile();
+            .useValue({ verifyToken: turnstileVerifyMock });
+
+        if (useRealInfra) {
+            // Integración real: la BD se limpia justo después de compilar el módulo
+            // (el provider DatabaseService ya puede instanciarse sin app.init())
+        } else {
+            moduleBuilder
+                .overrideProvider(DatabaseService)
+                .useValue({ query: dbQueryMock, getPool: jest.fn() })
+                .overrideProvider('REDIS_CLIENT')
+                .useValue(redisMock);
+        }
+
+        const moduleFixture: TestingModule = await moduleBuilder.compile();
 
         app = moduleFixture.createNestApplication();
         app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+        if (useRealInfra) {
+            const db = app.get(DatabaseService);
+            await db.query('DELETE FROM users WHERE email = $1', [testEmail]);
+        }
+
         await app.init();
     });
 
     afterAll(async () => {
+        if (useRealInfra) {
+            const db = app.get(DatabaseService);
+            await db.query('DELETE FROM users WHERE email = $1', [testEmail]).catch(() => { });
+        }
         await app.close();
     });
 
@@ -110,7 +133,7 @@ describe('Auth (e2e)', () => {
             id: 'user-1',
             name: 'New Rider',
             email: 'rider@example.com',
-            role: 'piloto',
+            role: 'rider',
             passwordHash,
             isActive: true,
         }];
@@ -139,7 +162,7 @@ describe('Auth (e2e)', () => {
             id: 'user-1',
             name: 'New Rider',
             email: 'rider@example.com',
-            role: 'piloto',
+            role: 'rider',
             passwordHash,
             isActive: true,
         }];
@@ -160,7 +183,7 @@ describe('Auth (e2e)', () => {
             id: 'user-1',
             name: 'New Rider',
             email: 'rider@example.com',
-            role: 'piloto',
+            role: 'rider',
             passwordHash,
             isActive: true,
         }];
@@ -178,7 +201,7 @@ describe('Auth (e2e)', () => {
             id: 'user-1',
             name: 'New Rider',
             email: 'rider@example.com',
-            role: 'piloto',
+            role: 'rider',
             passwordHash,
             isActive: true,
         }];
