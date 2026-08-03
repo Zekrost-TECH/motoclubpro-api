@@ -15,15 +15,20 @@ export class BillingController {
     @Get('subscription')
     async subscription(@CurrentClub() clubId?: string) {
         interface SubscriptionDb {
+            plan_id: string;
             status: string;
             current_period_start: string | Date | null;
             current_period_end: string | Date | null;
+            billing_cycle: string;
             plan_name: string;
             max_members: number;
+            price_monthly_cents: number;
+            price_yearly_cents: number;
         }
         const { rows: subRows } = await this.db.query<SubscriptionDb>(
-            `SELECT s.status, s.current_period_start, s.current_period_end,
-                    p.name AS plan_name, p.max_members
+            `SELECT s.plan_id, s.status, s.current_period_start, s.current_period_end,
+                    s.billing_cycle, p.name AS plan_name, p.max_members,
+                    p.price_monthly_cents, p.price_yearly_cents
              FROM club_subscriptions s
              JOIN plans p ON s.plan_id = p.id
              WHERE s.club_id = $1`,
@@ -31,7 +36,15 @@ export class BillingController {
         );
         const sub = subRows[0];
         if (!sub) {
-            return { plan: 'prueba', status: 'activa', startDate: null, endDate: null, memberLimit: 0, currentMembers: 0, price: 0, currency: 'COP' };
+            const { rows: fallbackRows } = await this.db.query<{ price_monthly_cents: number }>(
+                `SELECT price_monthly_cents FROM plans WHERE id = 'prueba'`,
+            );
+            const price = (fallbackRows[0]?.price_monthly_cents ?? 0) / 100;
+            return {
+                planId: 'prueba', plan: 'prueba', planName: 'Prueba', status: 'activa',
+                startDate: null, endDate: null, memberLimit: 0, currentMembers: 0,
+                price, priceYearly: 0, billingCycle: 'monthly', currency: 'COP',
+            };
         }
         const { rows: memberRows } = await this.db.query(
             `SELECT COUNT(*)::int AS count FROM club_members WHERE club_id = $1 AND is_active = TRUE`,
@@ -39,13 +52,17 @@ export class BillingController {
         );
         const currentMembers = memberRows[0]?.count ?? 0;
         return {
+            planId: sub.plan_id ?? 'prueba',
             plan: sub.plan_name || 'prueba',
+            planName: sub.plan_name || 'Prueba',
             status: sub.status || 'activa',
             startDate: sub.current_period_start ? new Date(sub.current_period_start).toISOString() : null,
             endDate: sub.current_period_end ? new Date(sub.current_period_end).toISOString() : null,
             memberLimit: sub.max_members ?? 0,
             currentMembers,
-            price: 0,
+            price: (sub.price_monthly_cents ?? 0) / 100,
+            priceYearly: (sub.price_yearly_cents ?? 0) / 100,
+            billingCycle: sub.billing_cycle ?? 'monthly',
             currency: 'COP',
         };
     }

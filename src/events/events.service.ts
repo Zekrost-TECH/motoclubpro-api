@@ -198,7 +198,10 @@ export class EventsService {
     }
 
     async findAll(status?: string, upcoming?: boolean, clubId?: string, page = 1, limit = 20): Promise<{ data: EventRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
-        let queryStr = 'SELECT * FROM events';
+        let queryStr = `SELECT id, status, title, description, date, time, difficulty, route_id,
+                               max_attendees, min_rider_level, meeting_point, meeting_point_lat,
+                               meeting_point_lng, organizer_id, club_id, created_at, updated_at
+                        FROM events`;
         let countQuery = 'SELECT COUNT(*)::int as count FROM events';
         const params: (string | boolean | null)[] = [];
         const conditions: string[] = [];
@@ -231,14 +234,64 @@ export class EventsService {
             this.db.query<EventRow>(queryStr, [...params, limit, offset]),
         ]);
 
-        await Promise.all(
-            res.rows.map(async (event) => {
-                const ev = event as EventRow & { attendees?: unknown; inventory?: unknown; guests?: unknown };
-                ev.attendees = await this.getAttendees(event.id, clubId);
-                ev.inventory = await this.getInventory(event.id, clubId);
-                ev.guests = await this.getGuests(event.id, clubId);
-            }),
-        );
+        // Batch de attendees/inventory/guests para la página completa (evita N+1).
+        // El club ya se validó en la query principal, así que no se re-verifica por evento.
+        const eventIds = res.rows.map((event) => event.id);
+        if (eventIds.length > 0) {
+            const [attendeeRes, inventoryRes, guestRes] = await Promise.all([
+                this.db.query<AttendeeRow & { event_id: string }>(
+                    `SELECT a.event_id, a.user_id, a.ride_role, a.confirmed_at, a.checklist_completed,
+                            u.name, u.nickname, u.rider_level
+                     FROM event_attendees a
+                     JOIN users u ON u.id = a.user_id
+                     WHERE a.event_id = ANY($1::uuid[])`,
+                    [eventIds],
+                ),
+                this.db.query<InventoryRow>(
+                    `SELECT * FROM inventory_items WHERE event_id = ANY($1::uuid[])`,
+                    [eventIds],
+                ),
+                this.db.query<GuestRow>(
+                    `SELECT g.id, g.event_id, g.invited_by, g.guest_type, g.full_name,
+                            g.phone, g.notes, g.confirmed_at, g.created_at,
+                            u.name AS inviter_name
+                     FROM event_guests g
+                     LEFT JOIN users u ON u.id = g.invited_by
+                     WHERE g.event_id = ANY($1::uuid[])
+                     ORDER BY g.created_at ASC`,
+                    [eventIds],
+                ),
+            ]);
+
+            const attendeesByEvent = new Map<string, AttendeeRow[]>();
+            for (const row of attendeeRes.rows) {
+                const { event_id: rowEventId, ...attendee } = row;
+                const list = attendeesByEvent.get(rowEventId) ?? [];
+                list.push(attendee);
+                attendeesByEvent.set(rowEventId, list);
+            }
+
+            const inventoryByEvent = new Map<string, InventoryRow[]>();
+            for (const row of inventoryRes.rows) {
+                const list = inventoryByEvent.get(row.event_id) ?? [];
+                list.push(row);
+                inventoryByEvent.set(row.event_id, list);
+            }
+
+            const guestsByEvent = new Map<string, GuestRow[]>();
+            for (const row of guestRes.rows) {
+                const list = guestsByEvent.get(row.event_id) ?? [];
+                list.push(row);
+                guestsByEvent.set(row.event_id, list);
+            }
+
+            for (const event of res.rows) {
+                const ev = event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] };
+                ev.attendees = attendeesByEvent.get(event.id) ?? [];
+                ev.inventory = inventoryByEvent.get(event.id) ?? [];
+                ev.guests = guestsByEvent.get(event.id) ?? [];
+            }
+        }
 
         const total = countRes.rows[0]?.count ?? 0;
         return {

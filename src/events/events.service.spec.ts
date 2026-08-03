@@ -95,8 +95,9 @@ describe('EventsService', () => {
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [{ count: 1 }] })
                 .mockResolvedValueOnce({ rows: [mockEvent] })
-                .mockResolvedValueOnce({ rows: [] }) // attendees
-                .mockResolvedValueOnce({ rows: [] }); // inventory
+                .mockResolvedValueOnce({ rows: [] }) // attendees (batch)
+                .mockResolvedValueOnce({ rows: [] }) // inventory (batch)
+                .mockResolvedValueOnce({ rows: [] }); // guests (batch)
 
             const result = await service.findAll();
             expect(result.data).toHaveLength(1);
@@ -108,10 +109,55 @@ describe('EventsService', () => {
                 .mockResolvedValueOnce({ rows: [{ count: 1 }] })
                 .mockResolvedValueOnce({ rows: [mockEvent] })
                 .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [] })
                 .mockResolvedValueOnce({ rows: [] });
 
             const result = await service.findAll('proximo', true);
             expect(result.data).toHaveLength(1);
+        });
+
+        it('should batch attendees/inventory/guests with ANY() instead of per-event queries', async () => {
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [{ count: 1 }] })
+                .mockResolvedValueOnce({ rows: [{ ...mockEvent, id: 'event-1' }, { ...mockEvent, id: 'event-2' }] })
+                .mockResolvedValueOnce({
+                    rows: [
+                        { event_id: 'event-1', user_id: 'u1', ride_role: 'puntero', confirmed_at: 'x', checklist_completed: true, name: 'A', nickname: 'a', rider_level: 'novato' },
+                        { event_id: 'event-2', user_id: 'u2', ride_role: 'rider', confirmed_at: 'x', checklist_completed: false, name: 'B', nickname: 'b', rider_level: 'basico' },
+                    ],
+                })
+                .mockResolvedValueOnce({
+                    rows: [
+                        { id: 'i1', event_id: 'event-1', name: 'Casco', category: 'seguridad', quantity: 2 },
+                    ],
+                })
+                .mockResolvedValueOnce({
+                    rows: [
+                        { id: 'g1', event_id: 'event-2', invited_by: 'u2', guest_type: 'acompañante', full_name: 'G', created_at: 'now' },
+                    ],
+                });
+
+            const result = await service.findAll();
+            expect(result.data).toHaveLength(2);
+
+            const batchSqlCalls = dbQueryMock.mock.calls.slice(2).map((c) => c[0] as string);
+            for (const sql of batchSqlCalls) {
+                expect(sql).toContain('ANY($1::uuid[])');
+            }
+            expect(batchSqlCalls).toHaveLength(3);
+
+            const [e1, e2] = result.data;
+            expect(e1.attendees).toHaveLength(1);
+            expect((e1.attendees as { user_id: string }[])[0].user_id).toBe('u1');
+            expect(e2.attendees).toHaveLength(1);
+            expect((e2.attendees as { user_id: string }[])[0].user_id).toBe('u2');
+            expect(e1.inventory).toHaveLength(1);
+            expect(e2.guests).toHaveLength(1);
+            expect(e1.guests).toHaveLength(0);
+
+            // attendees no deben filtrar event_id (respuesta idéntica a antes)
+            const attendees = e1.attendees as Record<string, unknown>[];
+            expect(attendees[0]).not.toHaveProperty('event_id');
         });
     });
 
