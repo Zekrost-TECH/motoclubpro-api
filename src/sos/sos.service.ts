@@ -108,7 +108,7 @@ export class SosService {
         await this.fcm.sendSOSAlert({ senderName, type, lat, lng, tokens });
     }
 
-    async findAll(clubId?: string, page = 1, limit = 20): Promise<{ data: SosAlertRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+    async findAll(clubId?: string, page = 1, limit = 20, status?: string): Promise<{ data: SosAlertRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
         let query = `
             SELECT s.id, s.user_id, u.name AS user_name, s.event_id, s.type, s.status, s.description,
                    s.resolved_by, s.created_at, s.resolved_at,
@@ -117,12 +117,23 @@ export class SosService {
             FROM sos_alerts s
             LEFT JOIN users u ON u.id = s.user_id`;
         let countQuery = `SELECT COUNT(*)::int as count FROM sos_alerts`;
+        const conditions: string[] = [];
         const params: (string | null)[] = [];
 
         if (clubId) {
-            query += ' WHERE s.club_id = $1';
-            countQuery += ' WHERE club_id = $1';
             params.push(clubId);
+            conditions.push(`s.club_id = $${params.length}`);
+        }
+
+        if (status) {
+            params.push(status);
+            conditions.push(`s.status = $${params.length}`);
+        }
+
+        if (conditions.length > 0) {
+            const where = ` WHERE ${conditions.join(' AND ')}`;
+            query += where;
+            countQuery += where.replaceAll('s.', '');
         }
         query += ' ORDER BY s.created_at DESC';
 

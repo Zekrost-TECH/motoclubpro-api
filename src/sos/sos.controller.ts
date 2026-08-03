@@ -28,8 +28,8 @@ export class SosController {
     }
 
     @Get()
-    async findAll(@CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: SosAlertRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
-        return await this.sosService.findAll(clubId, pagination?.page, pagination?.limit);
+    async findAll(@CurrentClub() clubId?: string, @Query('status') status?: string, @Query() pagination?: PaginationDto): Promise<{ data: SosAlertRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+        return await this.sosService.findAll(clubId, pagination?.page, pagination?.limit, status);
     }
 
     @Get('active')
