@@ -19,15 +19,15 @@ export class TurnstileService {
 
     /**
      * Verifica un token de Turnstile contra la API de Cloudflare.
-     * Si no esta configurada la secret key, se omite la validacion y se permite
-     * el login (util para desarrollo o si se desactiva temporalmente).
+     * Fail-closed: si la secret key no está configurada o Cloudflare no
+     * responde, el login web se rechaza (no se permite pasar sin captcha).
      */
     async verifyToken(token?: string | null, remoteip?: string): Promise<boolean> {
         const secretKey = this.configService.get<string>('TURNSTILE_SECRET_KEY');
 
         if (!secretKey) {
-            this.logger.warn('TURNSTILE_SECRET_KEY no esta configurada. Omitiendo validacion de Turnstile.');
-            return true;
+            this.logger.error('TURNSTILE_SECRET_KEY no esta configurada. Rechazando validacion de Turnstile.');
+            return false;
         }
 
         if (!token) {
@@ -55,9 +55,8 @@ export class TurnstileService {
             return data.success;
         } catch (error) {
             this.logger.error('Error al contactar la API de Turnstile', error);
-            // Fail-open: si Cloudflare no responde, permitimos el login pero lo registramos.
-            // Esto evita bloquear a todos los administradores si Turnstile tiene downtime.
-            return true;
+            // Fail-closed: si Cloudflare no responde, rechazamos el login.
+            return false;
         }
     }
 }
