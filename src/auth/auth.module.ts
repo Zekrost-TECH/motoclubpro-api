@@ -24,6 +24,8 @@ import { TurnstileModule } from '../turnstile/turnstile.module';
                 secret: configService.get<string>('JWT_SECRET') || 'defaultSecretChangeThis',
                 signOptions: {
                     expiresIn: (configService.get<string>('JWT_EXPIRES_IN') || '15m') as unknown as '15m',
+                    issuer: 'biker-os-api',
+                    audience: 'biker-os-clients',
                 },
             }),
             inject: [ConfigService],
