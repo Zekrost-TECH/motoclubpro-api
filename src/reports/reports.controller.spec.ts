@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
+import { ClubGuard } from '../auth/guards/club.guard';
+import { ClubRolesGuard } from '../auth/guards/club-roles.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 describe('ReportsController', () => {
     let controller: ReportsController;
@@ -18,7 +21,11 @@ describe('ReportsController', () => {
         const module: TestingModule = await Test.createTestingModule({
             controllers: [ReportsController],
             providers: [{ provide: ReportsService, useValue: mockReportsService }],
-        }).compile();
+        })
+            .overrideGuard(JwtAuthGuard).useValue({ canActivate: () => true })
+            .overrideGuard(ClubGuard).useValue({ canActivate: () => true })
+            .overrideGuard(ClubRolesGuard).useValue({ canActivate: () => true })
+            .compile();
 
         controller = module.get<ReportsController>(ReportsController);
         service = module.get<ReportsService>(ReportsService);

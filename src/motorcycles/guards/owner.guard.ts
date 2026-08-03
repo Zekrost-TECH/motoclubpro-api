@@ -16,7 +16,7 @@ export class OwnerGuard implements CanActivate {
             throw new ForbiddenException('User context is missing');
         }
 
-        if (user.role === UserRole.admin) {
+        if (user.role === UserRole.superadmin || user.role === UserRole.admin) {
             return true;
         }
 

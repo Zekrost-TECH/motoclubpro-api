@@ -1,16 +1,24 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserRole } from './users.types';
 import { toSnakeCase } from '../common/utils/string.utils';
+import type { AuthUser } from '../auth/auth.types';
+
+const ASSIGNABLE_ROLES: Record<string, UserRole[]> = {
+    superadmin: [UserRole.superadmin, UserRole.admin, UserRole.leader, UserRole.rider],
+    admin: [UserRole.admin, UserRole.leader, UserRole.rider],
+    leader: [UserRole.rider],
+    rider: [UserRole.rider],
+};
 
 @Injectable()
 export class UsersService {
     constructor(private db: DatabaseService) { }
 
-    async createUser(data: CreateUserDto): Promise<User> {
+    async createUser(data: CreateUserDto, actor?: AuthUser): Promise<User> {
         const { rows: existingUser } = await this.db.query(
             'SELECT id FROM users WHERE email = $1 LIMIT 1',
             [data.email]
@@ -21,6 +29,15 @@ export class UsersService {
         }
 
         if (!data.password) throw new ConflictException('Password required');
+
+        const requestedRole = data.role ?? UserRole.rider;
+        if (requestedRole !== UserRole.rider) {
+            const allowed = actor ? ASSIGNABLE_ROLES[actor.role] : [UserRole.rider];
+            if (!allowed || !allowed.includes(requestedRole)) {
+                throw new ForbiddenException('No tienes permisos para asignar este rol');
+            }
+        }
+
         const hashedPassword = await bcrypt.hash(data.password, 10);
 
         const { rows } = await this.db.query<User>(
@@ -32,7 +49,7 @@ export class UsersService {
                 data.name,
                 data.nickname,
                 data.email,
-                data.role || 'rider',
+                requestedRole,
                 data.riderLevel || 'novato',
                 hashedPassword
             ]
@@ -79,6 +96,25 @@ export class UsersService {
             data: rows,
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
+    }
+
+    private assertCanAssignRole(actor: AuthUser | undefined, role: UserRole, action: string): void {
+        if (!actor) throw new ForbiddenException(`No tienes permisos para ${action} roles`);
+        const allowed = ASSIGNABLE_ROLES[actor.role];
+        if (!allowed || !allowed.includes(role)) {
+            throw new ForbiddenException(`No tienes permisos para ${action} este rol`);
+        }
+    }
+
+    private async findOneForRoleCheck(id: string): Promise<{ role: UserRole }> {
+        const { rows } = await this.db.query<{ role: UserRole }>(
+            'SELECT role FROM users WHERE id = $1 LIMIT 1',
+            [id],
+        );
+        if (rows.length === 0) {
+            throw new NotFoundException(`User with ID ${id} not found`);
+        }
+        return rows[0];
     }
 
     private async computeUserStats(userId: string): Promise<{ ridesCompleted: number; totalKm: number }> {
@@ -168,7 +204,15 @@ export class UsersService {
         return user;
     }
 
-    async updateUser(id: string, data: UpdateUserDto): Promise<User> {
+    async updateUser(id: string, data: UpdateUserDto, actor?: AuthUser): Promise<User> {
+        if (data.role) {
+            this.assertCanAssignRole(actor, data.role, 'actualizar');
+            const target = await this.findOneForRoleCheck(id);
+            if (target.role === UserRole.superadmin && actor?.role !== UserRole.superadmin) {
+                throw new ForbiddenException('No puedes modificar un superadmin');
+            }
+        }
+
         const typedData: Record<string, unknown> = { ...data };
 
         if (typedData.emergencyContact && typeof typedData.emergencyContact === 'object') {
@@ -220,7 +264,12 @@ export class UsersService {
         return rows[0];
     }
 
-    async remove(id: string): Promise<User> {
+    async remove(id: string, actor?: AuthUser): Promise<User> {
+        const target = await this.findOneForRoleCheck(id);
+        if (target.role === UserRole.superadmin && actor?.role !== UserRole.superadmin) {
+            throw new ForbiddenException('No puedes eliminar un superadmin');
+        }
+
         const { rows } = await this.db.query<User>(`
             UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1
             RETURNING id, name, nickname, email, role, rider_level AS "riderLevel", join_date AS "joinDate", is_active AS "isActive"

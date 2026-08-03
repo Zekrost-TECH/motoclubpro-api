@@ -53,7 +53,7 @@ export class AuthService {
     }
 
     async register(data: RegisterDto): Promise<{ access_token: string; refresh_token: string; user: Omit<User, 'passwordHash'> & { clubs: { club_id: string; role: UserRole }[] } }> {
-        const user = await this.usersService.createUser(data);
+        const user = await this.usersService.createUser({ ...data, role: UserRole.rider });
         const { passwordHash: _ph, ...result } = user;
         void _ph;
         return this.login(result as Omit<User, 'passwordHash'>);

@@ -18,6 +18,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
 import { SelfOrAdminGuard } from '../auth/guards/self-or-admin.guard';
+import { UserManagerGuard } from './guards/user-manager.guard';
 import { UserRole } from './users.types';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -33,9 +34,9 @@ export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Post()
-    @Roles(UserRole.admin)
-    create(@Body() createUserDto: CreateUserDto): Promise<User> {
-        return this.usersService.createUser(createUserDto);
+    @UseGuards(UserManagerGuard)
+    create(@Body() createUserDto: CreateUserDto, @Request() req: AuthRequest): Promise<User> {
+        return this.usersService.createUser(createUserDto, req.user);
     }
 
     @Get()
@@ -65,8 +66,9 @@ export class UsersController {
     update(
         @Param('id') id: string,
         @Body() updateUserDto: UpdateUserDto,
+        @Request() req: AuthRequest,
     ): Promise<User> {
-        return this.usersService.updateUser(id, updateUserDto);
+        return this.usersService.updateUser(id, updateUserDto, req.user);
     }
 
     @Get(':id/medical')
@@ -77,7 +79,7 @@ export class UsersController {
 
     @Delete(':id')
     @Roles(UserRole.admin)
-    remove(@Param('id') id: string): Promise<User> {
-        return this.usersService.remove(id);
+    remove(@Param('id') id: string, @Request() req: AuthRequest): Promise<User> {
+        return this.usersService.remove(id, req.user);
     }
 }

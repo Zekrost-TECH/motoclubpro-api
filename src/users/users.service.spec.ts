@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { DatabaseService } from '../database/database.service';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import { NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { UserRole } from './users.types';
 
 describe('UsersService', () => {
@@ -45,6 +45,34 @@ describe('UsersService', () => {
             db.query.mockResolvedValueOnce({ rows: [{ id: 'u1' }] });
             await expect(service.createUser({ email: 't@test.com' } as never)).rejects.toThrow(ConflictException);
         });
+
+        it('should reject creating a user with elevated role without actor', async () => {
+            db.query.mockResolvedValueOnce({ rows: [] });
+            await expect(service.createUser({
+                name: 'Test', email: 't@test.com', password: '123456', role: UserRole.admin,
+            } as never)).rejects.toThrow(ForbiddenException);
+        });
+
+        it('should reject a global admin creating a superadmin', async () => {
+            db.query.mockResolvedValueOnce({ rows: [] });
+            await expect(service.createUser({
+                name: 'Test', email: 't@test.com', password: '123456', role: UserRole.superadmin,
+            } as never, { id: 'admin-1', email: 'a@b.com', role: UserRole.admin })).rejects.toThrow(ForbiddenException);
+        });
+
+        it('should allow a global admin creating a leader', async () => {
+            db.query.mockResolvedValueOnce({ rows: [] });
+            db.query.mockResolvedValueOnce({
+                rows: [{
+                    id: 'u1', name: 'Test', nickname: 't', email: 't@test.com',
+                    role: UserRole.leader, riderLevel: 'novato', joinDate: new Date(), isActive: true,
+                }],
+            });
+            const result = await service.createUser({
+                name: 'Test', email: 't@test.com', password: '123456', role: UserRole.leader,
+            } as never, { id: 'admin-1', email: 'a@b.com', role: UserRole.admin });
+            expect(result.role).toBe(UserRole.leader);
+        });
     });
 
     describe('findAll', () => {
@@ -70,6 +98,7 @@ describe('UsersService', () => {
     describe('findOne', () => {
         it('should return user with motorcycle and positions', async () => {
             db.query.mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'A' }] });
+            db.query.mockResolvedValueOnce({ rows: [] });
             db.query.mockResolvedValueOnce({ rows: [{ brand: 'Yamaha' }] });
             db.query.mockResolvedValueOnce({ rows: [{ clubPositionName: 'President' }] });
 
@@ -87,6 +116,7 @@ describe('UsersService', () => {
     describe('findByEmail', () => {
         it('should return a user when found', async () => {
             db.query.mockResolvedValueOnce({ rows: [{ id: 'u1', email: 't@test.com' }] });
+            db.query.mockResolvedValueOnce({ rows: [] });
             const result = await service.findByEmail('t@test.com');
             expect(result?.email).toBe('t@test.com');
         });
@@ -131,6 +161,7 @@ describe('UsersService', () => {
             db.query
                 .mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'A' }] })
                 .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [] })
                 .mockResolvedValueOnce({ rows: [] });
             const result = await service.updateUser('u1', {} as never);
             expect(result.id).toBe('u1');
@@ -157,9 +188,15 @@ describe('UsersService', () => {
 
     describe('remove', () => {
         it('should soft-delete a user', async () => {
+            db.query.mockResolvedValueOnce({ rows: [{ role: UserRole.rider }] });
             db.query.mockResolvedValueOnce({ rows: [{ id: 'u1', isActive: false }] });
             const result = await service.remove('u1');
             expect(result.isActive).toBe(false);
+        });
+
+        it('should throw ForbiddenException when trying to remove a superadmin without actor', async () => {
+            db.query.mockResolvedValueOnce({ rows: [{ role: UserRole.superadmin }] });
+            await expect(service.remove('u1')).rejects.toThrow(ForbiddenException);
         });
 
         it('should throw NotFoundException when user not found', async () => {

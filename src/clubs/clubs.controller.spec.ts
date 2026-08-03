@@ -5,6 +5,7 @@ import { NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from '../users/users.service';
 import { Reflector } from '@nestjs/core';
+import { UserRole } from '../users/users.types';
 
 describe('ClubsController', () => {
     let controller: ClubsController;
@@ -76,7 +77,7 @@ describe('ClubsController', () => {
 
     describe('inviteMember', () => {
         it('should invite a member by userId', async () => {
-            const dto = { userId: 'user-2', role: 'rider' };
+            const dto = { userId: 'user-2', role: UserRole.rider };
             const req = { user: { id: 'admin-1', email: 'admin@test.com' } } as any;
             const result = await controller.inviteMember('club-1', dto, req);
             expect(result).toEqual({ ok: true });
@@ -84,7 +85,7 @@ describe('ClubsController', () => {
         });
 
         it('should invite a member by email creating a new account', async () => {
-            const dto = { email: 'new@user.com', role: 'rider' };
+            const dto = { email: 'new@user.com', role: UserRole.rider };
             const req = { user: { id: 'admin-1', email: 'admin@test.com' } } as any;
             const result = await controller.inviteMember('club-1', dto, req);
             expect(result).toEqual({ ok: true });

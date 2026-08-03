@@ -1,19 +1,18 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { CLUB_ROLES_KEY } from '../../auth/decorators/club-role.decorator';
+import { DatabaseService } from '../../database/database.service';
 import { UserRole } from '../../users/users.types';
 import type { AuthRequest } from '../../auth/auth.types';
 
-interface ClubMember {
-    club_id: string;
-    role: UserRole;
-}
-
 @Injectable()
 export class ClubMemberRolesGuard implements CanActivate {
-    constructor(private readonly reflector: Reflector) { }
+    constructor(
+        private readonly reflector: Reflector,
+        private readonly db: DatabaseService,
+    ) { }
 
-    canActivate(context: ExecutionContext): boolean {
+    async canActivate(context: ExecutionContext): Promise<boolean> {
         const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(CLUB_ROLES_KEY, [
             context.getHandler(),
             context.getClass(),
@@ -31,13 +30,18 @@ export class ClubMemberRolesGuard implements CanActivate {
             throw new ForbiddenException('User context is missing');
         }
 
-        if (user.role === UserRole.admin) {
+        if (user.role === UserRole.superadmin || user.role === UserRole.admin) {
             return true;
         }
 
-        const member = (user.clubs as ClubMember[] | undefined)?.find((c) => c.club_id === clubId);
+        const { rows } = await this.db.query<{ role: UserRole }>(
+            `SELECT role FROM club_members
+             WHERE club_id = $1 AND user_id = $2 AND is_active = TRUE
+             LIMIT 1`,
+            [clubId, user.id],
+        );
 
-        if (!member || !requiredRoles.includes(member.role)) {
+        if (!rows[0] || !requiredRoles.includes(rows[0].role)) {
             throw new ForbiddenException('Insufficient role in this club');
         }
 

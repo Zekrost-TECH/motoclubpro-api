@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { ClubsService } from './clubs.service';
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../notifications/mail.service';
 import { RideRolesService } from '../ride-roles/ride-roles.service';
 import { PlansService } from '../plans/plans.service';
+import { UserRole } from '../users/users.types';
 
 describe('ClubsService', () => {
     let service: ClubsService;
@@ -28,7 +30,7 @@ describe('ClubsService', () => {
                 { provide: UsersService, useValue: { findByEmail: jest.fn() } },
                 { provide: MailService, useValue: { sendInvitation: jest.fn().mockResolvedValue(true) } },
                 { provide: RideRolesService, useValue: { seedDefaults: jest.fn().mockResolvedValue(undefined) } },
-                { provide: PlansService, useValue: { assertCanAddMember: jest.fn().mockResolvedValue(undefined) } },
+                { provide: PlansService, useValue: { assertCanAddMember: jest.fn().mockResolvedValue(undefined), getClubLimits: jest.fn().mockResolvedValue(undefined) } },
             ],
         }).compile();
 
@@ -74,6 +76,36 @@ describe('ClubsService', () => {
             expect(result.data).toHaveLength(1);
             expect(result.data[0].name).toBe('Alice');
             expect(result.meta.total).toBe(1);
+        });
+    });
+
+    describe('inviteMember', () => {
+        it('should throw ForbiddenException when no inviter', async () => {
+            await expect(service.inviteMember('club-1', 'u1', undefined, 'rider')).rejects.toThrow(ForbiddenException);
+        });
+
+        it('should reject a leader inviting an admin', async () => {
+            db.query.mockResolvedValueOnce({ rows: [{ role: 'leader' }] });
+            await expect(
+                service.inviteMember('club-1', 'u1', undefined, 'admin', { id: 'inviter', email: 'i@b.com', role: UserRole.leader }),
+            ).rejects.toThrow(ForbiddenException);
+        });
+
+        it('should allow a club admin inviting a leader', async () => {
+            db.query
+                .mockResolvedValueOnce({ rows: [{ role: 'admin' }] })
+                .mockResolvedValueOnce({ rows: [{ count: 0 }] })
+                .mockResolvedValueOnce({ rows: [] });
+            await service.inviteMember('club-1', 'u1', undefined, 'leader', { id: 'inviter', email: 'i@b.com', role: UserRole.rider });
+            expect(db.query).toHaveBeenLastCalledWith(expect.stringContaining('INSERT INTO club_members'), ['club-1', 'u1', 'leader']);
+        });
+
+        it('should allow superadmin to invite with any role', async () => {
+            db.query
+                .mockResolvedValueOnce({ rows: [{ count: 0 }] })
+                .mockResolvedValueOnce({ rows: [] });
+            await service.inviteMember('club-1', 'u1', undefined, 'admin', { id: 'sa', email: 'sa@b.com', role: UserRole.superadmin });
+            expect(db.query).toHaveBeenLastCalledWith(expect.stringContaining('INSERT INTO club_members'), ['club-1', 'u1', 'admin']);
         });
     });
 });

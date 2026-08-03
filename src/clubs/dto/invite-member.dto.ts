@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsEmail } from 'class-validator';
+import { IsString, IsOptional, IsEmail, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { UserRole } from '../../users/users.types';
 
 export class InviteMemberDto {
     @ApiProperty({ description: 'User ID to invite' })
@@ -12,8 +13,8 @@ export class InviteMemberDto {
     @IsEmail()
     email?: string;
 
-    @ApiPropertyOptional({ description: 'Role to assign' })
+    @ApiPropertyOptional({ description: 'Role to assign', enum: UserRole, default: UserRole.rider })
     @IsOptional()
-    @IsString()
-    role?: string;
+    @IsEnum(UserRole)
+    role?: UserRole;
 }

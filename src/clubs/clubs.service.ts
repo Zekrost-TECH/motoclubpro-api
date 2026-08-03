@@ -169,6 +169,9 @@ export class ClubsService {
   }
 
   async inviteMember(clubId: string, userId: string | undefined, email: string | undefined, role: string, invitedBy?: AuthUser): Promise<void> {
+    const targetRole = role || UserRole.rider;
+    await this.assertCanAssignClubRole(clubId, invitedBy, targetRole);
+
     let targetUserId = userId;
 
     if (!targetUserId && email) {
@@ -212,7 +215,7 @@ export class ClubsService {
 
     await this.plansService.assertCanAddMember(clubId, invitedBy?.role);
 
-    if (role === 'admin' || role === 'leader') {
+    if (targetRole === 'admin' || targetRole === 'leader') {
       const limits = await this.plansService.getClubLimits(clubId);
       if (limits && !limits.features.multiple_admins && !limits.features.unlimited) {
         const { rows: adminRows } = await this.db.query<{ count: number }>(
@@ -232,8 +235,39 @@ export class ClubsService {
        VALUES ($1, $2, $3)
        ON CONFLICT (club_id, user_id) DO UPDATE
        SET role = $3, is_active = TRUE`,
-      [clubId, targetUserId, role],
+      [clubId, targetUserId, targetRole],
     );
+  }
+
+  private async assertCanAssignClubRole(clubId: string, invitedBy: AuthUser | undefined, targetRole: string): Promise<void> {
+    if (!invitedBy) {
+      throw new ForbiddenException('No puedes invitar miembros');
+    }
+
+    // Superadmin global: puede asignar cualquier rol
+    if (invitedBy.role === UserRole.superadmin) {
+      return;
+    }
+
+    // Rol efectivo del invitador dentro de este club (fuente autoritativa: BD)
+    const { rows } = await this.db.query<{ role: UserRole }>(
+      `SELECT role FROM club_members
+       WHERE club_id = $1 AND user_id = $2 AND is_active = TRUE
+       LIMIT 1`,
+      [clubId, invitedBy.id],
+    );
+    const inviterClubRole = rows[0]?.role ?? invitedBy.role;
+
+    const assignable: Record<string, UserRole[]> = {
+      [UserRole.admin]: [UserRole.admin, UserRole.leader, UserRole.rider],
+      [UserRole.leader]: [UserRole.leader, UserRole.rider],
+      [UserRole.rider]: [UserRole.rider],
+    };
+
+    const allowed = assignable[inviterClubRole];
+    if (!allowed || !allowed.includes(targetRole as UserRole)) {
+      throw new ForbiddenException('No tienes permisos para asignar ese rol en este club');
+    }
   }
 
   async joinClub(clubId: string, userId: string): Promise<void> {

@@ -2,10 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { SelfOrAdminGuard } from '../auth/guards/self-or-admin.guard';
+import { DatabaseService } from '../database/database.service';
+import { UserRole } from './users.types';
 
 describe('UsersController', () => {
     let controller: UsersController;
     let usersService: jest.Mocked<UsersService>;
+
+    const mockReq = { user: { id: 'u1', email: 'a@b.com', role: UserRole.admin } };
 
     beforeEach(async () => {
         usersService = {
@@ -24,6 +28,7 @@ describe('UsersController', () => {
             providers: [
                 { provide: UsersService, useValue: usersService },
                 SelfOrAdminGuard,
+                { provide: DatabaseService, useValue: { query: jest.fn() } },
             ],
         }).compile();
 
@@ -31,11 +36,12 @@ describe('UsersController', () => {
     });
 
     describe('create', () => {
-        it('should create a user', async () => {
+        it('should create a user passing the actor', async () => {
             const dto = { name: 'Test', email: 't@test.com', password: 'pass' };
             usersService.createUser.mockResolvedValue({ id: 'u1', ...dto } as never);
-            const result = await controller.create(dto as never);
+            const result = await controller.create(dto as never, mockReq as never);
             expect(result.id).toBe('u1');
+            expect(usersService.createUser).toHaveBeenCalledWith(dto, mockReq.user);
         });
     });
 
@@ -57,10 +63,11 @@ describe('UsersController', () => {
     });
 
     describe('update', () => {
-        it('should update a user', async () => {
+        it('should update a user passing the actor', async () => {
             usersService.updateUser.mockResolvedValue({ id: 'u1', name: 'Updated' } as never);
-            const result = await controller.update('u1', { name: 'Updated' } as never);
+            const result = await controller.update('u1', { name: 'Updated' } as never, mockReq as never);
             expect(result.name).toBe('Updated');
+            expect(usersService.updateUser).toHaveBeenCalledWith('u1', { name: 'Updated' }, mockReq.user);
         });
     });
 
@@ -73,10 +80,11 @@ describe('UsersController', () => {
     });
 
     describe('remove', () => {
-        it('should remove a user', async () => {
+        it('should remove a user passing the actor', async () => {
             usersService.remove.mockResolvedValue({ id: 'u1' } as never);
-            const result = await controller.remove('u1');
+            const result = await controller.remove('u1', mockReq as never);
             expect(result.id).toBe('u1');
+            expect(usersService.remove).toHaveBeenCalledWith('u1', mockReq.user);
         });
     });
 });

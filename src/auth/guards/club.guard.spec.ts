@@ -1,15 +1,22 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { ClubGuard } from './club.guard';
+import { DatabaseService } from '../../database/database.service';
 import { UserRole } from '../../users/users.types';
 
 describe('ClubGuard', () => {
     let guard: ClubGuard;
+    let db: { query: jest.Mock };
 
-    beforeEach(() => {
-        guard = new ClubGuard();
+    beforeEach(async () => {
+        db = { query: jest.fn() };
+        const module = await Test.createTestingModule({
+            providers: [ClubGuard, { provide: DatabaseService, useValue: db }],
+        }).compile();
+        guard = module.get<ClubGuard>(ClubGuard);
     });
 
-    const createContext = (user?: { role: UserRole; clubs?: { club_id: string; role: UserRole }[] }, clubId?: string): ExecutionContext => {
+    const createContext = (user?: { role: UserRole; id?: string }, clubId?: string): ExecutionContext => {
         return {
             switchToHttp: () => ({
                 getRequest: () => ({
@@ -20,32 +27,38 @@ describe('ClubGuard', () => {
         } as unknown as ExecutionContext;
     };
 
-    it('should return false if no user', () => {
-        expect(guard.canActivate(createContext())).toBe(false);
+    it('should return false if no user', async () => {
+        expect(await guard.canActivate(createContext())).toBe(false);
     });
 
-    it('should allow admin regardless of club membership', () => {
-        const result = guard.canActivate(createContext({ role: UserRole.admin }, 'club-1'));
+    it('should allow admin regardless of club membership', async () => {
+        const result = await guard.canActivate(createContext({ role: UserRole.admin }, 'club-1'));
         expect(result).toBe(true);
     });
 
-    it('should allow if no clubId header', () => {
-        const result = guard.canActivate(createContext({ role: UserRole.rider, clubs: [] }));
+    it('should allow superadmin regardless of club membership', async () => {
+        const result = await guard.canActivate(createContext({ role: UserRole.superadmin }, 'club-1'));
         expect(result).toBe(true);
     });
 
-    it('should allow active member', () => {
-        const result = guard.canActivate(
-            createContext({ role: UserRole.rider, clubs: [{ club_id: 'club-1', role: UserRole.rider }] }, 'club-1'),
+    it('should allow if no clubId header', async () => {
+        const result = await guard.canActivate(createContext({ role: UserRole.rider, id: 'u1' }));
+        expect(result).toBe(true);
+    });
+
+    it('should allow active member (verified against DB)', async () => {
+        db.query.mockResolvedValueOnce({ rows: [{ '1': 1 }] });
+        const result = await guard.canActivate(
+            createContext({ role: UserRole.rider, id: 'u1' }, 'club-1'),
         );
         expect(result).toBe(true);
+        expect(db.query).toHaveBeenCalledWith(expect.any(String), ['club-1', 'u1']);
     });
 
-    it('should throw ForbiddenException if not a member', () => {
-        expect(() =>
-            guard.canActivate(
-                createContext({ role: UserRole.rider, clubs: [{ club_id: 'club-2', role: UserRole.rider }] }, 'club-1'),
-            ),
-        ).toThrow(ForbiddenException);
+    it('should throw ForbiddenException if not a member', async () => {
+        db.query.mockResolvedValueOnce({ rows: [] });
+        await expect(
+            guard.canActivate(createContext({ role: UserRole.rider, id: 'u1' }, 'club-1')),
+        ).rejects.toThrow(ForbiddenException);
     });
 });
