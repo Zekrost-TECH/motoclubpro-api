@@ -1,4 +1,4 @@
-import { WebSocketGateway, WebSocketServer, OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import { WebSocketGateway, WebSocketServer, OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage } from '@nestjs/websockets';
 import { Inject, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { Redis } from 'ioredis';
@@ -77,20 +77,24 @@ export class SosGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         }
     }
 
+    @SubscribeMessage('subscribeClub')
     async subscribeClub(client: Socket, clubId: string): Promise<void> {
         await client.join(clubId);
         this.logger.verbose(`Client ${client.id} joined room ${clubId}`);
     }
 
+    @SubscribeMessage('subscribeEvent')
     async subscribeEvent(client: Socket, eventId: string): Promise<void> {
         await client.join(eventId);
         this.logger.verbose(`Client ${client.id} joined room ${eventId}`);
     }
 
+    @SubscribeMessage('unsubscribeClub')
     async unsubscribeClub(client: Socket, clubId: string): Promise<void> {
         await client.leave(clubId);
     }
 
+    @SubscribeMessage('unsubscribeEvent')
     async unsubscribeEvent(client: Socket, eventId: string): Promise<void> {
         await client.leave(eventId);
     }
