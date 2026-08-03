@@ -84,8 +84,9 @@ export class AuthController {
 
     @Get('clubs')
     @UseGuards(JwtAuthGuard)
-    async clubs(@Request() req: AuthRequest): Promise<{ clubs: { club_id: string; role: string; name: string; slug: string; description: string | null; logo_url: string | null; city: string | null; department: string | null; features: Record<string, boolean> }[]; activeClubId: string | null }> {
-        return { clubs: await this.authService.getUserClubs(req.user.id), activeClubId: null };
+    async clubs(@Request() req: AuthRequest & { headers: { 'x-club-id'?: string } }): Promise<{ clubs: { club_id: string; role: string; name: string; slug: string; description: string | null; logo_url: string | null; city: string | null; department: string | null; features: Record<string, boolean> }[]; activeClubId: string | null }> {
+        const activeClubId = req.headers['x-club-id'] ?? null;
+        return { clubs: await this.authService.getUserClubs(req.user.id), activeClubId };
     }
 
     @Post('switch-club')
