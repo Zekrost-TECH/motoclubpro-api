@@ -3,9 +3,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum SupportType {
     TALLER = 'taller',
-    LLANTERIA = 'llantería',
+    LLANTERIA = 'llanteria',
     GASOLINERA = 'gasolinera',
-    GRUA = 'grúa',
+    GRUA = 'grua',
     DESCANSO = 'descanso',
     HOSPITAL = 'hospital',
 }
