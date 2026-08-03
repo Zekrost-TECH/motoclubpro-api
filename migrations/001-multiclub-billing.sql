@@ -44,7 +44,7 @@ CREATE TABLE club_members (
   id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id   UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role      user_role NOT NULL DEFAULT 'piloto',
+  role      user_role NOT NULL DEFAULT 'rider',
   joined_at TIMESTAMPTZ DEFAULT NOW(),
   invited_by UUID REFERENCES users(id),
   is_active BOOLEAN DEFAULT TRUE,
