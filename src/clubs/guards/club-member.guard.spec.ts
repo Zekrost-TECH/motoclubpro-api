@@ -36,7 +36,8 @@ describe('ClubMemberGuard', () => {
         expect(result).toBe(true);
     });
 
-    it('should allow admin without checking membership', async () => {
+    it('should allow admin after verifying the club exists and is active', async () => {
+        db.query.mockResolvedValueOnce({ rows: [{ '1': 1 }] });
         const ctx = {
             switchToHttp: () => ({
                 getRequest: () => ({
@@ -47,7 +48,20 @@ describe('ClubMemberGuard', () => {
         } as unknown as ExecutionContext;
         const result = await guard.canActivate(ctx);
         expect(result).toBe(true);
-        expect(db.query).not.toHaveBeenCalled();
+        expect(db.query).toHaveBeenCalledWith(expect.stringContaining('FROM clubs'), ['club-1']);
+    });
+
+    it('should reject admin operating on a non-existent or inactive club', async () => {
+        db.query.mockResolvedValueOnce({ rows: [] });
+        const ctx = {
+            switchToHttp: () => ({
+                getRequest: () => ({
+                    user: { id: 'admin-1', role: UserRole.admin },
+                    params: { id: 'club-x' },
+                }),
+            }),
+        } as unknown as ExecutionContext;
+        await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw ForbiddenException if not a member', async () => {

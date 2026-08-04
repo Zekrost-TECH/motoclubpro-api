@@ -32,13 +32,22 @@ describe('ClubGuard', () => {
     });
 
     it('should allow admin regardless of club membership', async () => {
+        db.query.mockResolvedValueOnce({ rows: [{ '1': 1 }] });
         const result = await guard.canActivate(createContext({ role: UserRole.admin }, 'club-1'));
         expect(result).toBe(true);
     });
 
     it('should allow superadmin regardless of club membership', async () => {
+        db.query.mockResolvedValueOnce({ rows: [{ '1': 1 }] });
         const result = await guard.canActivate(createContext({ role: UserRole.superadmin }, 'club-1'));
         expect(result).toBe(true);
+    });
+
+    it('should reject admin operating on a non-existent or inactive club', async () => {
+        db.query.mockResolvedValueOnce({ rows: [] });
+        await expect(
+            guard.canActivate(createContext({ role: UserRole.admin }, 'club-x')),
+        ).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow if no clubId header', async () => {

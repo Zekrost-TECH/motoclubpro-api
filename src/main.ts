@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { DatabaseExceptionFilter } from './database/database-exception.filter';
+import { buildCorsOriginValidator } from './common/cors';
 
 process.on('unhandledRejection', (reason) => {
   Logger.error('Unhandled Rejection', reason instanceof Error ? reason.stack : String(reason));
@@ -76,25 +77,8 @@ async function bootstrap() {
     .map((o) => o.trim())
     .filter(Boolean);
 
-  // Capacitor Android/iOS sirve la WebView desde estos orígenes
-  // En desarrollo con Android Emulator, Capacitor carga desde el Vite dev server.
-  const capacitorOrigins = new Set([
-    'capacitor://localhost',
-    'https://localhost',
-    'http://localhost',
-    'http://10.0.2.2:5173',
-  ]);
-
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        return callback(null, true);
-      }
-      if (capacitorOrigins.has(origin) || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error(`CORS bloqueado: ${origin}`), false);
-    },
+    origin: buildCorsOriginValidator(allowedOrigins),
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-club-id'],
     credentials: true,

@@ -48,14 +48,24 @@ describe('ClubRolesGuard', () => {
 
     it('should allow admin regardless of club role', async () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.leader]);
+        db.query.mockResolvedValueOnce({ rows: [{ '1': 1 }] });
         const result = await guard.canActivate(createContext({ role: UserRole.admin }, 'club-1'));
         expect(result).toBe(true);
     });
 
     it('should allow superadmin regardless of club role', async () => {
         reflector.getAllAndOverride.mockReturnValue([UserRole.leader]);
+        db.query.mockResolvedValueOnce({ rows: [{ '1': 1 }] });
         const result = await guard.canActivate(createContext({ role: UserRole.superadmin }, 'club-1'));
         expect(result).toBe(true);
+    });
+
+    it('should reject admin operating on a non-existent or inactive club', async () => {
+        reflector.getAllAndOverride.mockReturnValue([UserRole.leader]);
+        db.query.mockResolvedValueOnce({ rows: [] });
+        await expect(
+            guard.canActivate(createContext({ role: UserRole.admin }, 'club-x')),
+        ).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow if user has required role in club (verified against DB)', async () => {

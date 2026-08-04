@@ -50,7 +50,12 @@ describe('SosController', () => {
         it('should return all alerts', async () => {
             const result = await controller.findAll('club-1');
             expect(result).toEqual({ data: [mockAlert], meta: { total: 1, page: 1, limit: 20, totalPages: 1 } });
-            expect(service.findAll).toHaveBeenCalledWith('club-1', undefined, undefined);
+            expect(service.findAll).toHaveBeenCalledWith('club-1', undefined, undefined, undefined);
+        });
+
+        it('should pass the status filter', async () => {
+            await controller.findAll('club-1', 'activa');
+            expect(service.findAll).toHaveBeenCalledWith('club-1', undefined, undefined, 'activa');
         });
     });
 

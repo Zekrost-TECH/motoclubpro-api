@@ -1,6 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { UserRole } from '../../users/users.types';
+import { assertActiveClub } from '../../common/utils/assert-active-club';
 import type { AuthRequest } from '../../auth/auth.types';
 
 @Injectable()
@@ -17,6 +18,9 @@ export class ClubMemberGuard implements CanActivate {
         }
 
         if (user.role === UserRole.superadmin || user.role === UserRole.admin) {
+            // Bypass de membresía para admins globales, pero el club referenciado
+            // debe existir y estar activo (INF-04).
+            await assertActiveClub(this.db, clubId);
             return true;
         }
 

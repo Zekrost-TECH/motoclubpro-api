@@ -43,13 +43,21 @@ describe('ClubMemberRolesGuard', () => {
     });
 
     it('should allow admin bypass', async () => {
+        db.query.mockResolvedValueOnce({ rows: [{ '1': 1 }] });
         const context = createContext({ id: 'u1', role: UserRole.admin }, 'c1') as never;
         expect(await guard.canActivate(context)).toBe(true);
     });
 
     it('should allow superadmin bypass', async () => {
+        db.query.mockResolvedValueOnce({ rows: [{ '1': 1 }] });
         const context = createContext({ id: 'u1', role: UserRole.superadmin }, 'c1') as never;
         expect(await guard.canActivate(context)).toBe(true);
+    });
+
+    it('should reject admin operating on a non-existent or inactive club', async () => {
+        db.query.mockResolvedValueOnce({ rows: [] });
+        const context = createContext({ id: 'u1', role: UserRole.admin }, 'cX') as never;
+        await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow when user has required club role (verified against DB)', async () => {
