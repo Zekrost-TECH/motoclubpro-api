@@ -18,7 +18,7 @@ describe('CORS middleware (e2e)', () => {
         app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
         app.enableCors({
             origin: (origin, callback) => {
-                const allowed = new Set(['https://web.zekrost.com', 'https://panel.zekrost.com']);
+                const allowed = new Set(['https://bikeros.co', 'https://admin.bikeros.co']);
                 const capacitor = new Set(['capacitor://localhost', 'https://localhost', 'http://localhost', 'http://10.0.2.2:5173']);
                 if (!origin) { callback(null, true); return; }
                 if (capacitor.has(origin) || allowed.has(origin)) { callback(null, true); return; }
@@ -39,10 +39,10 @@ describe('CORS middleware (e2e)', () => {
     it('preflight de origen permitido responde 204 con ACAO', async () => {
         const res = await request(app.getHttpServer())
             .options('/')
-            .set('Origin', 'https://web.zekrost.com')
+            .set('Origin', 'https://bikeros.co')
             .set('Access-Control-Request-Method', 'GET');
         expect([204, 200]).toContain(res.status);
-        expect(res.headers['access-control-allow-origin']).toBe('https://web.zekrost.com');
+        expect(res.headers['access-control-allow-origin']).toBe('https://bikeros.co');
     });
 
     it('preflight de origen desconocido es rechazado', async () => {
@@ -56,9 +56,9 @@ describe('CORS middleware (e2e)', () => {
     it('GET con Origin permitido incluye ACAO', async () => {
         const res = await request(app.getHttpServer())
             .get('/ping')
-            .set('Origin', 'https://panel.zekrost.com');
+            .set('Origin', 'https://admin.bikeros.co');
         expect(res.status).toBe(200);
-        expect(res.headers['access-control-allow-origin']).toBe('https://panel.zekrost.com');
+        expect(res.headers['access-control-allow-origin']).toBe('https://admin.bikeros.co');
     });
 
     it('GET sin Origin (cliente no-browser) funciona', async () => {

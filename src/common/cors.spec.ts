@@ -1,7 +1,7 @@
 import { buildCorsOriginValidator } from './cors';
 
 describe('buildCorsOriginValidator', () => {
-    const validator = buildCorsOriginValidator(['https://panel.biker-os.zekrost.com', 'https://web.zekrost.com']);
+    const validator = buildCorsOriginValidator(['https://admin.bikeros.co', 'https://bikeros.co']);
 
     const check = (origin: string | undefined | null): { err: Error | null; allow?: boolean } => {
         let result: { err: Error | null; allow?: boolean } = { err: null };
@@ -30,7 +30,7 @@ describe('buildCorsOriginValidator', () => {
     });
 
     it('should allow whitelisted origins', () => {
-        const r = check('https://panel.biker-os.zekrost.com');
+        const r = check('https://admin.bikeros.co');
         expect(r.err).toBeNull();
         expect(r.allow).toBe(true);
     });
