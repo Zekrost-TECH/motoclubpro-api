@@ -20,11 +20,8 @@ process.on('uncaughtException', (err) => {
 });
 
 function validateEnv(config: ConfigService): void {
-  const required = [
-    'DATABASE_URL',
-    'JWT_SECRET',
-    'REFRESH_SECRET',
-    'REDIS_URL',
+  const dryRun = config.get<string>('BILLING_DRY_RUN') === 'true';
+  const billingKeys = [
     'WOMPI_PRIVATE_KEY',
     'WOMPI_PUBLIC_KEY',
     'WOMPI_BASE_URL',
@@ -33,9 +30,19 @@ function validateEnv(config: ConfigService): void {
     'ALEGRA_API_KEY',
     'ALEGRA_BASE_URL',
   ];
+  const required = [
+    'DATABASE_URL',
+    'JWT_SECRET',
+    'REFRESH_SECRET',
+    'REDIS_URL',
+    ...(dryRun ? [] : billingKeys),
+  ];
   const missing = required.filter((key) => !config.get<string>(key));
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+  if (dryRun) {
+    Logger.warn('BILLING_DRY_RUN activo: pagos y facturacion se simulan sin Wompi/Alegra', 'Bootstrap');
   }
 }
 

@@ -3,16 +3,17 @@ import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../database/database.service';
 
 interface AlegraInvoiceItem {
-  id?: number;
+  id?: number | string;
   name: string;
   price: number;
   discount?: string;
   quantity?: number;
-  taxes?: { id: number }[];
+  tax?: { id: number | string }[];
 }
 
 interface AlegraInvoicePayload {
   client: {
+    id?: string | number;
     name: string;
     identification?: string;
     address?: string;
@@ -21,19 +22,23 @@ interface AlegraInvoicePayload {
   };
   items: AlegraInvoiceItem[];
   paymentMethod?: string;
+  paymentForm?: string;
   status?: string;
   numberTemplate?: {
-    id: number;
+    id: number | string;
   };
   observations?: string;
+  stamp?: {
+    generateStamp: boolean;
+  };
 }
 
 interface AlegraInvoiceResponse {
-  id: number;
+  id: number | string;
   number: string;
-  cufe: string;
+  cufe?: string;
   status: string;
-  pdf: string;
+  pdf?: string;
 }
 
 @Injectable()
@@ -42,6 +47,9 @@ export class AlegraService {
   private readonly baseUrl: string;
   private readonly email: string;
   private readonly apiKey: string;
+  private readonly numberTemplateId: string | null;
+  private readonly itemPlanId: string | null;
+  private readonly itemOverageId: string | null;
 
   constructor(
     private readonly config: ConfigService,
@@ -50,6 +58,9 @@ export class AlegraService {
     this.baseUrl = this.config.get<string>('ALEGRA_BASE_URL') ?? '';
     this.email = this.config.get<string>('ALEGRA_EMAIL') ?? '';
     this.apiKey = this.config.get<string>('ALEGRA_API_KEY') ?? '';
+    this.numberTemplateId = this.config.get<string>('ALEGRA_NUMBER_TEMPLATE_ID') ?? null;
+    this.itemPlanId = this.config.get<string>('ALEGRA_ITEM_PLAN_ID') ?? null;
+    this.itemOverageId = this.config.get<string>('ALEGRA_ITEM_OVERAGE_ID') ?? null;
   }
 
   async generateInvoice(
@@ -88,24 +99,31 @@ export class AlegraService {
 
     const items: AlegraInvoiceItem[] = [
       {
+        id: this.itemPlanId ?? undefined,
         name: `Suscripcion BikerOS - ${planName}`,
         price: planAmountCents / 100,
         quantity: 1,
-        taxes: [],
+        tax: [],
       },
     ];
 
     if (overageAmountCents > 0) {
       items.push({
+        id: this.itemOverageId ?? undefined,
         name: 'Miembros adicionales',
         price: overageAmountCents / 100,
         quantity: 1,
-        taxes: [],
+        tax: [],
       });
     }
 
     const observations = this.buildObservations(club.tax_regime);
 
+    // Factura electrónica Colombia (docs Alegra 2025):
+    // - stamp.generateStamp=true  → expide la factura ante la DIAN (genera CUFE)
+    // - paymentForm/paymentMethod → obligatorios con facturación electrónica 2.1
+    // - numberTemplate.id         → numeración electrónica (opcional si la empresa
+    //                               tiene una numeración preferida configurada)
     const payload: AlegraInvoicePayload = {
       client: {
         name: club.name,
@@ -116,8 +134,14 @@ export class AlegraService {
       },
       items,
       status: 'open',
+      paymentForm: 'CASH',
+      paymentMethod: 'CASH',
       observations,
+      stamp: { generateStamp: true },
+      ...(this.numberTemplateId ? { numberTemplate: { id: this.numberTemplateId } } : {}),
     };
+
+    let data: AlegraInvoiceResponse;
 
     try {
       const res = await fetch(`${this.baseUrl}/invoices`, {
@@ -129,35 +153,56 @@ export class AlegraService {
         body: JSON.stringify(payload),
       });
 
+      // Si el timbre falla, Alegra crea la factura en borrador y responde 400
+      // con la factura creada: se guarda la factura y se reintenta el timbre después.
       if (!res.ok) {
         const error = (await res.json().catch(() => ({}))) as Record<string, unknown>;
         this.logger.error('Alegra invoice creation failed', error);
         return null;
       }
 
-      const data = (await res.json()) as AlegraInvoiceResponse;
-
-      await this.db.query(
-        `UPDATE payment_transactions
-         SET invoice_generated = TRUE,
-             dian_invoice_number = $1,
-             cufe = $2,
-             pdf_url = $3
-         WHERE id = $4`,
-        [data.number, data.cufe, data.pdf, txId],
-      );
-
-      this.logger.log(`Invoice generated: ${data.number} — CUFE: ${data.cufe}`);
-
-      return {
-        invoiceNumber: data.number,
-        cufe: data.cufe,
-        pdfUrl: data.pdf,
-      };
+      data = (await res.json()) as AlegraInvoiceResponse;
     } catch (err) {
       this.logger.error(`Failed to generate invoice for tx ${txId}`, err);
       return null;
     }
+
+    // pdf/cufe no vienen por defecto en la respuesta: se consultan con fields=pdf,xml
+    let pdfUrl = data.pdf ?? null;
+    if (!pdfUrl) {
+      try {
+        const detailRes = await fetch(`${this.baseUrl}/invoices/${data.id}?fields=pdf,xml,comments,events`, {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${this.email}:${this.apiKey}`).toString('base64')}`,
+          },
+        });
+        if (detailRes.ok) {
+          const detail = (await detailRes.json()) as { pdf?: string; cufe?: string };
+          pdfUrl = detail.pdf ?? null;
+          data.cufe = detail.cufe ?? data.cufe;
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to fetch invoice detail ${data.id}`, err);
+      }
+    }
+
+    await this.db.query(
+      `UPDATE payment_transactions
+       SET invoice_generated = TRUE,
+           dian_invoice_number = $1,
+           cufe = $2,
+           pdf_url = $3
+       WHERE id = $4`,
+      [data.number, data.cufe ?? null, pdfUrl, txId],
+    );
+
+    this.logger.log(`Invoice generated: ${data.number} — CUFE: ${data.cufe ?? 'n/a'}`);
+
+    return {
+      invoiceNumber: data.number,
+      cufe: data.cufe ?? '',
+      pdfUrl: pdfUrl ?? '',
+    };
   }
 
   private buildObservations(taxRegime: string | null): string {

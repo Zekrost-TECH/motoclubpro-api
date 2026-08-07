@@ -4,19 +4,28 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { WompiWebhookController } from './wompi-webhook.controller';
 import { BillingService } from './billing.service';
+import { DatabaseService } from '../database/database.service';
 
 describe('WompiWebhookController', () => {
     let controller: WompiWebhookController;
     let billingService: BillingService;
     let configService: ConfigService;
+    let dbQueryMock: jest.Mock;
 
     const secret = 'test-secret';
 
+    // Formato REAL del evento Wompi (verificado contra docs + sandbox 2026-08-06):
+    // signature.properties apuntan a campos DENTRO de data, checksum en signature.checksum
     function buildEvent(overrides: any = {}) {
         const base = {
             event: 'transaction.updated',
+            environment: 'test',
             timestamp: 1234567890,
-            properties: ['data.transaction.id', 'data.transaction.status', 'data.transaction.reference', 'data.transaction.status_message'],
+            sent_at: '2018-07-20T16:45:05.000Z',
+            signature: {
+                properties: ['transaction.id', 'transaction.status', 'transaction.reference', 'transaction.status_message'],
+                checksum: '',
+            },
             data: {
                 transaction: {
                     id: 'txn-1',
@@ -29,23 +38,24 @@ describe('WompiWebhookController', () => {
         const merged = JSON.parse(JSON.stringify(base));
         if (overrides.event) merged.event = overrides.event;
         if (overrides.timestamp) merged.timestamp = overrides.timestamp;
-        if (overrides.properties) merged.properties = overrides.properties;
+        if (overrides.signature?.properties) merged.signature.properties = overrides.signature.properties;
         if (overrides.data?.transaction) Object.assign(merged.data.transaction, overrides.data.transaction);
 
-        const values = merged.properties.map((prop: string) => {
+        const values = merged.signature.properties.map((prop: string) => {
             const parts = prop.split('.');
-            let val: any = merged;
-            for (const p of parts) val = val[p];
+            let val: any = merged.data;
+            for (const p of parts) val = val?.[p];
             return String(val ?? '');
         });
         const payload = values.join('') + merged.timestamp + secret;
-        const checksum = createHash('sha256').update(payload).digest('hex');
-        return { ...merged, checksum };
+        merged.signature.checksum = createHash('sha256').update(payload).digest('hex');
+        return merged;
     }
 
     let mockEvent: ReturnType<typeof buildEvent>;
 
     beforeEach(async () => {
+        dbQueryMock = jest.fn().mockResolvedValue({ rows: [], rowCount: 0 });
         const moduleRef: TestingModule = await Test.createTestingModule({
             controllers: [WompiWebhookController],
             providers: [
@@ -63,6 +73,7 @@ describe('WompiWebhookController', () => {
                         handleVoidedTransaction: jest.fn().mockResolvedValue(undefined),
                     },
                 },
+                { provide: DatabaseService, useValue: { query: dbQueryMock } },
             ],
         }).compile();
 
@@ -87,8 +98,7 @@ describe('WompiWebhookController', () => {
 
         it('should throw BadRequestException for invalid checksum', async () => {
             jest.spyOn(controller as any, 'verifyChecksum').mockReturnValue(false);
-            const invalidEvent = { ...mockEvent, checksum: 'invalid' };
-            await expect(controller.handleWebhook(invalidEvent)).rejects.toThrow(BadRequestException);
+            await expect(controller.handleWebhook(mockEvent)).rejects.toThrow(BadRequestException);
         });
 
         it('should handle APPROVED transaction', async () => {
@@ -109,6 +119,25 @@ describe('WompiWebhookController', () => {
             expect(billingService.handleVoidedTransaction).toHaveBeenCalledWith('txn-1', 'ref-1');
         });
 
+        it('should handle ERROR transaction as failed', async () => {
+            const errorEvent = buildEvent({ data: { transaction: { status: 'ERROR', status_message: 'timeout' } } });
+            await controller.handleWebhook(errorEvent);
+            expect(billingService.markPaymentFailed).toHaveBeenCalledWith('txn-1', 'ref-1', 'timeout');
+        });
+
+        it('should update club status on nequi_token.updated', async () => {
+            const nequiEvent = buildEvent({
+                event: 'nequi_token.updated',
+                signature: { properties: ['transaction.id', 'transaction.status'] },
+                data: { transaction: { id: 'src_nequi_1', status: 'AVAILABLE', reference: 'x' } },
+            });
+            await controller.handleWebhook(nequiEvent);
+            expect(dbQueryMock).toHaveBeenCalledWith(
+                expect.stringContaining('UPDATE clubs'),
+                ['AVAILABLE', 'src_nequi_1'],
+            );
+        });
+
         it('should return received for unhandled event type', async () => {
             const unknownEvent = buildEvent({ event: 'unknown.type' });
             const result = await controller.handleWebhook(unknownEvent);
@@ -117,14 +146,30 @@ describe('WompiWebhookController', () => {
     });
 
     describe('verifyChecksum', () => {
-        it('should verify valid SHA256 checksum', () => {
+        it('should verify valid SHA256 checksum from signature.checksum', () => {
             const validEvent = buildEvent({ data: { transaction: { status: 'APPROVED' } } });
             const result = (controller as any).verifyChecksum(validEvent, secret);
             expect(result).toBe(true);
         });
 
+        it('should verify checksum from X-Event-Checksum header', () => {
+            const validEvent = buildEvent({ data: { transaction: { status: 'APPROVED' } } });
+            const result = (controller as any).verifyChecksum(validEvent, secret, validEvent.signature.checksum);
+            expect(result).toBe(true);
+        });
+
         it('should reject invalid checksum', () => {
-            const result = (controller as any).verifyChecksum({ ...mockEvent, checksum: 'wrong' }, secret);
+            const result = (controller as any).verifyChecksum(
+                { ...mockEvent, signature: { ...mockEvent.signature, checksum: 'wrong' } },
+                secret,
+            );
+            expect(result).toBe(false);
+        });
+
+        it('should reject event without signature object', () => {
+            const withoutSignature: Record<string, unknown> = { ...mockEvent };
+            delete withoutSignature.signature;
+            const result = (controller as any).verifyChecksum(withoutSignature, secret);
             expect(result).toBe(false);
         });
     });
