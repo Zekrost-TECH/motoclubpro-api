@@ -125,4 +125,44 @@ describe('AuthService', () => {
             expect(redis.set).toHaveBeenCalledWith('blacklist:access-token', '1', 'EX', expect.any(Number));
         });
     });
+
+    describe('switchClub', () => {
+        it('should sign the JWT with the GLOBAL role, not the club role (ROD-14)', async () => {
+            // El usuario global es 'rider' pero en club-1 es 'leader'.
+            const db = (service as unknown as { db: { query: jest.Mock } }).db;
+            usersService.findOne.mockResolvedValue(mockUser as never);
+            usersService.getUserClubs.mockResolvedValue([
+                { club_id: 'club-1', role: UserRole.leader },
+            ]);
+            db.query
+                .mockResolvedValueOnce({ rows: [{ role: UserRole.leader }] }) // membresía en club-1
+                .mockResolvedValueOnce({ rows: [{ role: UserRole.rider }] }) // rol global del usuario
+                .mockResolvedValueOnce({
+                    rows: [{
+                        club_id: 'club-1', role: UserRole.leader, name: 'Club 1', slug: 'club-1',
+                        description: null, logo_url: null, city: null, department: null, features: {},
+                    }],
+                }); // getUserClubs
+
+            await service.switchClub('user-1', 'club-1');
+
+            expect(jwtService.sign).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    sub: 'user-1',
+                    role: UserRole.rider, // rol global, no el del club
+                    clubs: expect.arrayContaining([
+                        expect.objectContaining({ club_id: 'club-1', role: UserRole.leader }),
+                    ]),
+                }),
+            );
+        });
+
+        it('should reject switching to a club where the user is not an active member', async () => {
+            const db = (service as unknown as { db: { query: jest.Mock } }).db;
+            usersService.findOne.mockResolvedValue(mockUser as never);
+            db.query.mockResolvedValueOnce({ rows: [] }); // sin membresía activa
+
+            await expect(service.switchClub('user-1', 'club-x')).rejects.toThrow(UnauthorizedException);
+        });
+    });
 });

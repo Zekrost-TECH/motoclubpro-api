@@ -34,6 +34,7 @@ describe('EventsController', () => {
         serviceMock = {
             findAll: jest.fn().mockResolvedValue({ data: [mockEvent], meta: { total: 1, page: 1, limit: 20, totalPages: 1 } }),
             findOne: jest.fn().mockResolvedValue(mockEvent),
+            findActiveAcrossClubs: jest.fn().mockResolvedValue([mockEvent]),
             create: jest.fn().mockResolvedValue(mockEvent),
             update: jest.fn().mockResolvedValue(mockEvent),
             updateStatus: jest.fn().mockResolvedValue(mockEvent),
@@ -78,6 +79,15 @@ describe('EventsController', () => {
             const result = await controller.findOne('event-1', 'club-1');
             expect(result.id).toBe('event-1');
             expect(serviceMock.findOne).toHaveBeenCalledWith('event-1', 'club-1');
+        });
+    });
+
+    describe('findActive', () => {
+        it('should return active rides across all user clubs (ROD-15)', async () => {
+            const req = { user: { id: 'user-1' } } as any;
+            const result = await controller.findActive(req);
+            expect(result).toHaveLength(1);
+            expect(serviceMock.findActiveAcrossClubs).toHaveBeenCalledWith('user-1');
         });
     });
 

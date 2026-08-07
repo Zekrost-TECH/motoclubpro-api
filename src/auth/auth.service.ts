@@ -188,7 +188,6 @@ export class AuthService {
             throw new UnauthorizedException('Usuario no encontrado');
         }
 
-        let activeRole: UserRole = user.role;
         if (user.role !== UserRole.superadmin) {
             // Verify active membership
             const { rows } = await this.db.query<{ role: UserRole }>(
@@ -198,12 +197,15 @@ export class AuthService {
             if (rows.length === 0) {
                 throw new UnauthorizedException('No eres miembro activo de este club');
             }
-            activeRole = rows[0].role;
         }
 
         const clubs = await this.getUserClubs(userId);
 
-        const payload = { sub: user.id, email: user.email, role: activeRole, clubs };
+        // ROD-14: el claim `role` del token es el rol global del usuario, igual
+        // que en login/refresh. Antes se firmaba con el rol del club activo,
+        // lo que hacía que el tracker mostrara rol del club como rol de radar.
+        // El rol por club sigue disponible en el claim `clubs`.
+        const payload = { sub: user.id, email: user.email, role: user.role, clubs };
         const refreshSecret = this.configService.get<string>('REFRESH_SECRET');
         const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '30d';
 

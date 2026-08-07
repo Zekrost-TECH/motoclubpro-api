@@ -3,6 +3,7 @@ import { EventsService, type EventRow } from './events.service';
 import { DatabaseService } from '../database/database.service';
 import { RideRolesService } from '../ride-roles/ride-roles.service';
 import { PlansService } from '../plans/plans.service';
+import { FcmService } from '../notifications/fcm.service';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 
 describe('EventsService', () => {
@@ -51,9 +52,26 @@ describe('EventsService', () => {
                         set: jest.fn().mockResolvedValue(undefined),
                         sadd: jest.fn().mockResolvedValue(1),
                         srem: jest.fn().mockResolvedValue(1),
+                        hset: jest.fn().mockResolvedValue(1),
+                        hdel: jest.fn().mockResolvedValue(1),
                         del: jest.fn().mockResolvedValue(1),
                         get: jest.fn().mockResolvedValue(null),
                         sismember: jest.fn().mockResolvedValue(0),
+                        publish: jest.fn().mockResolvedValue(1),
+                        multi: jest.fn(() => ({
+                            del: jest.fn().mockReturnThis(),
+                            sadd: jest.fn().mockReturnThis(),
+                            hset: jest.fn().mockReturnThis(),
+                            hdel: jest.fn().mockReturnThis(),
+                            srem: jest.fn().mockReturnThis(),
+                            exec: jest.fn().mockResolvedValue([null, 1]),
+                        })),
+                    },
+                },
+                {
+                    provide: FcmService,
+                    useValue: {
+                        sendToTokens: jest.fn().mockResolvedValue(undefined),
                     },
                 },
                 {
@@ -196,6 +214,56 @@ describe('EventsService', () => {
             const result = await service.update('event-1', {});
             expect(result.id).toBe('event-1');
         });
+
+        it('should reject status changes (ROD-01: usar /status)', async () => {
+            await expect(service.update('event-1', { status: 'en_curso' } as never))
+                .rejects.toThrow(BadRequestException);
+            expect(dbQueryMock).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('syncTrackerAuth (contrato Redis del tracker)', () => {
+        function sharedTx() {
+            const txMock = {
+                del: jest.fn().mockReturnThis(),
+                sadd: jest.fn().mockReturnThis(),
+                hset: jest.fn().mockReturnThis(),
+                hdel: jest.fn().mockReturnThis(),
+                srem: jest.fn().mockReturnThis(),
+                exec: jest.fn().mockResolvedValue([null, 1]),
+            };
+            const redisMock = (service as unknown as { redis: { multi: jest.Mock } }).redis;
+            redisMock.multi.mockReturnValue(txMock);
+            return txMock;
+        }
+
+        it('should DELETE members/roles keys when there are 0 attendees (ROD-05)', async () => {
+            const txMock = sharedTx();
+            dbQueryMock.mockResolvedValueOnce({ rows: [] }); // getAttendees
+
+            await (service as unknown as { syncTrackerAuth(id: string): Promise<void> })
+                .syncTrackerAuth('event-1', 'club-1');
+
+            expect(txMock.del).toHaveBeenCalledWith('event:event-1:members', 'event:event-1:roles');
+            expect(txMock.sadd).not.toHaveBeenCalled();
+            expect(txMock.hset).not.toHaveBeenCalled();
+            await expect(txMock.exec()).resolves.toBeDefined();
+        });
+
+        it('should be atomic: DEL + SADD/HSET en una sola transacción (ROD-06)', async () => {
+            const txMock = sharedTx();
+            dbQueryMock.mockResolvedValueOnce({
+                rows: [{ user_id: 'u1', ride_role: 'puntero' }],
+            });
+
+            await (service as unknown as { syncTrackerAuth(id: string): Promise<void> })
+                .syncTrackerAuth('event-1', 'club-1');
+
+            expect(txMock.del).toHaveBeenCalledWith('event:event-1:members', 'event:event-1:roles');
+            expect(txMock.sadd).toHaveBeenCalledWith('event:event-1:members', 'u1');
+            expect(txMock.hset).toHaveBeenCalledWith('event:event-1:roles', 'u1', 'puntero');
+            await expect(txMock.exec()).resolves.toBeDefined();
+        });
     });
 
     describe('remove', () => {
@@ -226,6 +294,61 @@ describe('EventsService', () => {
             jest.spyOn(service, 'findOne').mockResolvedValue(completedEvent as any);
 
             await expect(service.updateStatus('event-1', 'cancelado')).rejects.toThrow(BadRequestException);
+        });
+
+        it('should publish the status change to the tracker channel (ROD-02/09)', async () => {
+            const draftEvent = { ...mockEvent, status: 'proximo' };
+            jest.spyOn(service, 'findOne').mockResolvedValue(draftEvent as any);
+            dbQueryMock.mockResolvedValueOnce({ rows: [{ ...draftEvent, status: 'cancelado' }] });
+            const redisMock = (service as unknown as { redis: { publish: jest.Mock } }).redis;
+
+            const result = await service.updateStatus('event-1', 'cancelado');
+            expect(result.status).toBe('cancelado');
+            expect(redisMock.publish).toHaveBeenCalledWith(
+                'event:event-1:status',
+                expect.stringContaining('"eventId":"event-1"'),
+            );
+            expect(redisMock.publish).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.stringContaining('"status":"cancelado"'),
+            );
+        });
+
+        it('should sync tracker auth and notify attendees by FCM when ride starts (ROD-03)', async () => {
+            const draftEvent = { ...mockEvent, status: 'proximo' };
+            jest.spyOn(service, 'findOne').mockResolvedValue(draftEvent as any);
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [{ ...draftEvent, status: 'en_curso' }] }) // UPDATE
+                .mockResolvedValueOnce({ rows: [{ user_id: 'u1', ride_role: 'rider' }] })   // syncTrackerAuth → getAttendees
+                .mockResolvedValueOnce({ rows: [{ fcm_token: 'tok-1' }, { fcm_token: 'tok-2' }] }); // notifyRideStarted
+
+            await service.updateStatus('event-1', 'en_curso');
+            await new Promise((r) => setImmediate(r));
+
+            const fcmMock = (service as unknown as { fcm: { sendToTokens: jest.Mock } }).fcm;
+            expect(fcmMock.sendToTokens).toHaveBeenCalledWith(
+                ['tok-1', 'tok-2'],
+                expect.objectContaining({ title: 'Rodada iniciada' }),
+                expect.objectContaining({ eventId: 'event-1', type: 'ride_started' }),
+            );
+        });
+    });
+
+    describe('findActiveAcrossClubs (ROD-15)', () => {
+        it('should return en_curso events joining user memberships', async () => {
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [mockEvent] })
+                .mockResolvedValueOnce({ rows: [] }) // attendees (batch)
+                .mockResolvedValueOnce({ rows: [] }) // inventory (batch)
+                .mockResolvedValueOnce({ rows: [] }); // guests (batch)
+
+            const result = await service.findActiveAcrossClubs('user-1');
+            expect(result).toHaveLength(1);
+            expect(result[0]).toEqual(expect.objectContaining({ id: 'event-1', attendees: [] }));
+            const call = dbQueryMock.mock.calls[0];
+            expect(call[0]).toContain("e.status = 'en_curso'");
+            expect(call[0]).toContain('cm.user_id = $1');
+            expect(call[1]).toEqual(['user-1']);
         });
     });
 

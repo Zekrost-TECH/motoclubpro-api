@@ -1,4 +1,4 @@
-import { Injectable, Inject, UnauthorizedException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Inject, UnauthorizedException, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { DatabaseService } from '../database/database.service';
 import type { CreatePositionDto } from './dto/create-position.dto';
@@ -41,6 +41,15 @@ export class TrackerService {
      */
     async savePosition(user: AuthUser, dto: CreatePositionDto): Promise<{ saved: boolean }> {
         const { eventId, lat, lng, speed, heading, timestamp, name } = dto;
+
+        // ROD-08: descartar coordenadas fuera de rango (GPS corrupto/manipulado)
+        // antes de contaminar el radar.
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            throw new BadRequestException('Coordenadas fuera de rango');
+        }
+        if (speed !== undefined && (speed < 0 || speed > 500)) {
+            throw new BadRequestException('Velocidad fuera de rango');
+        }
 
         // 1. Verificar que el evento existe y está en curso
         const eventRes = await this.db.query(

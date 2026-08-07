@@ -47,6 +47,13 @@ export class EventsController {
         return this.eventsService.findAll(status, isUpcoming, clubId, query?.page, query?.limit);
     }
 
+    @Get('active')
+    findActive(@Request() req: AuthRequest): Promise<Array<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }>> {
+        // Rodadas en curso de TODOS los clubes del usuario (ROD-15): no depende
+        // del club activo, resuelve membresías desde la BD.
+        return this.eventsService.findActiveAcrossClubs(req.user.id);
+    }
+
     @Get(':id')
     findOne(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }> {
         return this.eventsService.findOne(id, clubId);

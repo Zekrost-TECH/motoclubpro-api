@@ -17,6 +17,7 @@ import { RideRole, GuestType } from './events.types';
 import { RideRolesService } from '../ride-roles/ride-roles.service';
 import { PlansService } from '../plans/plans.service';
 import { UserRole } from '../users/users.types';
+import { FcmService } from '../notifications/fcm.service';
 
 export interface EventRow {
     id: string;
@@ -100,17 +101,23 @@ export class EventsService {
         @Inject('REDIS_CLIENT') private readonly redis: Redis,
         private readonly rideRolesService: RideRolesService,
         private readonly plansService: PlansService,
+        private readonly fcm: FcmService,
     ) { }
 
     // ── Contrato Redis de autorización del tracker ─────────────────────────────
     // event:{id}:club    → clubId dueño del evento
     // event:{id}:members → SET de userId autorizados a ver el tracking en vivo
+    // event:{id}:roles   → HASH userId → ride_role (rol canónico del radar)
     private eventClubKey(eventId: string): string {
         return `event:${eventId}:club`;
     }
 
     private eventMembersKey(eventId: string): string {
         return `event:${eventId}:members`;
+    }
+
+    private eventRolesKey(eventId: string): string {
+        return `event:${eventId}:roles`;
     }
 
     // El estado en Redis es best-effort: un fallo no debe tumbar la operación de negocio.
@@ -125,6 +132,10 @@ export class EventsService {
     // Sincroniza las claves de autorización del tracker con la BD.
     // Útil cuando los asistentes se modifican fuera del flujo RSVP (DB directa,
     // imports, scripts) o simplemente como medida de seguridad en el read-path.
+    // - Atómico: DEL + SADD/HSET en una sola transacción (evita la ventana donde
+    //   un rider desaparece del SET y su WS es rechazado).
+    // - Con 0 asistentes se BORRAN las claves: un rider dado de baja no puede
+    //   quedar autorizado (antes el early-return dejaba el SET viejo en Redis).
     private async syncTrackerAuth(eventId: string, clubId?: string | null): Promise<void> {
         if (clubId) {
             await this.safeRedis(
@@ -134,13 +145,20 @@ export class EventsService {
         }
 
         const attendees = await this.getAttendees(eventId);
-        const memberIds = attendees.map((a) => a.user_id);
-        if (memberIds.length === 0) return;
 
         await this.safeRedis(async () => {
-            const key = this.eventMembersKey(eventId);
-            await this.redis.del(key);
-            await this.redis.sadd(key, ...memberIds);
+            const membersKey = this.eventMembersKey(eventId);
+            const rolesKey = this.eventRolesKey(eventId);
+
+            const tx = this.redis.multi();
+            tx.del(membersKey, rolesKey);
+            if (attendees.length > 0) {
+                tx.sadd(membersKey, ...attendees.map((a) => a.user_id));
+                for (const a of attendees) {
+                    tx.hset(rolesKey, a.user_id, a.ride_role);
+                }
+            }
+            await tx.exec();
         }, `sync members event ${eventId}`);
     }
 
@@ -224,7 +242,10 @@ export class EventsService {
         queryStr += whereClause;
         countQuery += whereClause;
 
-        queryStr += ` ORDER BY date ASC, time ASC`;
+        // Orden: primero rodadas en curso, luego próximas, luego las demás.
+        // Sin esto, una rodada en_curso con fecha pasada o futura podía quedar
+        // fuera de la página 1 con clubes de >20 eventos (ROD-10).
+        queryStr += ` ORDER BY CASE status WHEN 'en_curso' THEN 0 WHEN 'proximo' THEN 1 ELSE 2 END, date ASC, time ASC`;
 
         const offset = (page - 1) * limit;
         queryStr += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
@@ -235,69 +256,95 @@ export class EventsService {
         ]);
 
         // Batch de attendees/inventory/guests para la página completa (evita N+1).
-        // El club ya se validó en la query principal, así que no se re-verifica por evento.
-        const eventIds = res.rows.map((event) => event.id);
-        if (eventIds.length > 0) {
-            const [attendeeRes, inventoryRes, guestRes] = await Promise.all([
-                this.db.query<AttendeeRow & { event_id: string }>(
-                    `SELECT a.event_id, a.user_id, a.ride_role, a.confirmed_at, a.checklist_completed,
-                            u.name, u.nickname, u.rider_level
-                     FROM event_attendees a
-                     JOIN users u ON u.id = a.user_id
-                     WHERE a.event_id = ANY($1::uuid[])`,
-                    [eventIds],
-                ),
-                this.db.query<InventoryRow>(
-                    `SELECT * FROM inventory_items WHERE event_id = ANY($1::uuid[])`,
-                    [eventIds],
-                ),
-                this.db.query<GuestRow>(
-                    `SELECT g.id, g.event_id, g.invited_by, g.guest_type, g.full_name,
-                            g.phone, g.notes, g.confirmed_at, g.created_at,
-                            u.name AS inviter_name
-                     FROM event_guests g
-                     LEFT JOIN users u ON u.id = g.invited_by
-                     WHERE g.event_id = ANY($1::uuid[])
-                     ORDER BY g.created_at ASC`,
-                    [eventIds],
-                ),
-            ]);
-
-            const attendeesByEvent = new Map<string, AttendeeRow[]>();
-            for (const row of attendeeRes.rows) {
-                const { event_id: rowEventId, ...attendee } = row;
-                const list = attendeesByEvent.get(rowEventId) ?? [];
-                list.push(attendee);
-                attendeesByEvent.set(rowEventId, list);
-            }
-
-            const inventoryByEvent = new Map<string, InventoryRow[]>();
-            for (const row of inventoryRes.rows) {
-                const list = inventoryByEvent.get(row.event_id) ?? [];
-                list.push(row);
-                inventoryByEvent.set(row.event_id, list);
-            }
-
-            const guestsByEvent = new Map<string, GuestRow[]>();
-            for (const row of guestRes.rows) {
-                const list = guestsByEvent.get(row.event_id) ?? [];
-                list.push(row);
-                guestsByEvent.set(row.event_id, list);
-            }
-
-            for (const event of res.rows) {
-                const ev = event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] };
-                ev.attendees = attendeesByEvent.get(event.id) ?? [];
-                ev.inventory = inventoryByEvent.get(event.id) ?? [];
-                ev.guests = guestsByEvent.get(event.id) ?? [];
-            }
-        }
+        await this._attachDetails(res.rows);
 
         const total = countRes.rows[0]?.count ?? 0;
         return {
             data: res.rows,
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
+    }
+
+    // Adjunta attendees/inventory/guests a una lista de eventos con 3 queries
+    // batch (evita N+1). Mutates las filas recibidas.
+    private async _attachDetails(rows: EventRow[]): Promise<void> {
+        const eventIds = rows.map((event) => event.id);
+        if (eventIds.length === 0) return;
+
+        const [attendeeRes, inventoryRes, guestRes] = await Promise.all([
+            this.db.query<AttendeeRow & { event_id: string }>(
+                `SELECT a.event_id, a.user_id, a.ride_role, a.confirmed_at, a.checklist_completed,
+                        u.name, u.nickname, u.rider_level
+                 FROM event_attendees a
+                 JOIN users u ON u.id = a.user_id
+                 WHERE a.event_id = ANY($1::uuid[])`,
+                [eventIds],
+            ),
+            this.db.query<InventoryRow & { event_id: string }>(
+                `SELECT * FROM inventory_items WHERE event_id = ANY($1::uuid[])`,
+                [eventIds],
+            ),
+            this.db.query<GuestRow & { event_id: string }>(
+                `SELECT g.id, g.event_id, g.invited_by, g.guest_type, g.full_name,
+                        g.phone, g.notes, g.confirmed_at, g.created_at,
+                        u.name AS inviter_name
+                 FROM event_guests g
+                 LEFT JOIN users u ON u.id = g.invited_by
+                 WHERE g.event_id = ANY($1::uuid[])
+                 ORDER BY g.created_at ASC`,
+                [eventIds],
+            ),
+        ]);
+
+        const attendeesByEvent = new Map<string, AttendeeRow[]>();
+        for (const row of attendeeRes.rows) {
+            const { event_id: rowEventId, ...attendee } = row;
+            const list = attendeesByEvent.get(rowEventId) ?? [];
+            list.push(attendee);
+            attendeesByEvent.set(rowEventId, list);
+        }
+
+        const inventoryByEvent = new Map<string, InventoryRow[]>();
+        for (const row of inventoryRes.rows) {
+            const list = inventoryByEvent.get(row.event_id) ?? [];
+            list.push(row);
+            inventoryByEvent.set(row.event_id, list);
+        }
+
+        const guestsByEvent = new Map<string, GuestRow[]>();
+        for (const row of guestRes.rows) {
+            const list = guestsByEvent.get(row.event_id) ?? [];
+            list.push(row);
+            guestsByEvent.set(row.event_id, list);
+        }
+
+        for (const event of rows) {
+            const ev = event as EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] };
+            ev.attendees = attendeesByEvent.get(event.id) ?? [];
+            ev.inventory = inventoryByEvent.get(event.id) ?? [];
+            ev.guests = guestsByEvent.get(event.id) ?? [];
+        }
+    }
+
+    // Rodadas en curso de TODOS los clubes donde el usuario es miembro activo.
+    // Resuelve ROD-15: un rider con club activo ≠ club de la rodada seguía sin
+    // detectarla porque la lista normal está filtrada por el club activo.
+    async findActiveAcrossClubs(userId: string): Promise<Array<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }>> {
+        const res = await this.db.query<EventRow>(
+            `SELECT e.id, e.status, e.title, e.description, e.date, e.time, e.difficulty, e.route_id,
+                    e.max_attendees, e.min_rider_level, e.meeting_point, e.meeting_point_lat,
+                    e.meeting_point_lng, e.organizer_id, e.club_id, e.created_at, e.updated_at
+             FROM events e
+             JOIN club_members cm ON cm.club_id = e.club_id
+             WHERE e.status = 'en_curso'
+               AND cm.user_id = $1
+               AND cm.is_active = TRUE
+               AND e.club_id IS NOT NULL
+             ORDER BY e.date ASC, e.time ASC`,
+            [userId],
+        );
+        await this._attachDetails(res.rows);
+        return res.rows as Array<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }>;
     }
 
     async findOne(id: string, clubId?: string): Promise<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }> {
@@ -323,11 +370,19 @@ export class EventsService {
     }
 
     async update(id: string, updateEventDto: UpdateEventDto, clubId?: string): Promise<EventRow> {
-        const keys = Object.keys(updateEventDto);
+        // El estado de un evento NO se cambia por aquí: si se aceptara, se
+        // saltaría la máquina de estados y la sincronización del tracker
+        // (syncTrackerAuth). Usar PATCH /events/:id/status.
+        const { status: _status, ...rest } = updateEventDto as { status?: string };
+        if (_status !== undefined) {
+            throw new BadRequestException('El estado no se modifica por este endpoint. Usa PATCH /events/:id/status');
+        }
+
+        const keys = Object.keys(rest);
         if (keys.length === 0) return this.findOne(id, clubId);
 
         const setClauses = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
-        const params: unknown[] = Object.values(updateEventDto);
+        const params: unknown[] = Object.values(rest);
         params.push(id);
 
         let query = `UPDATE events SET ${setClauses}, updated_at = NOW() WHERE id = $${params.length}`;
@@ -356,7 +411,7 @@ export class EventsService {
 
         // Limpiar las claves de autorización del tracker.
         await this.safeRedis(
-            () => this.redis.del(this.eventClubKey(id), this.eventMembersKey(id)),
+            () => this.redis.del(this.eventClubKey(id), this.eventMembersKey(id), this.eventRolesKey(id)),
             `del auth keys event ${id}`,
         );
 
@@ -386,9 +441,18 @@ export class EventsService {
         const updated = res.rows[0];
         if (updated && newStatus === 'en_curso') {
             // Antes de que los riders intenten conectarse, asegurar que Redis
-            // refleje los asistentes actuales de la BD.
+            // refleje los asistentes actuales de la BD (members + roles).
             await this.syncTrackerAuth(updated.id, updated.club_id ?? null);
+            // ROD-03: avisar a los asistentes que la rodada arrancó.
+            this.notifyRideStarted(updated.id, updated.title).catch((err) => {
+                this.logger.error('Error notificando inicio de rodada', err instanceof Error ? err.stack : String(err));
+            });
         }
+
+        // ROD-02/09: avisar al tracker de cualquier cambio de estado. Al dejar
+        // de estar en curso, el tracker cierra los sockets del evento y purga
+        // las posiciones para que el radar muera de inmediato.
+        await this.publishEventStatus(updated.id, newStatus);
 
         if (updated && newStatus === 'completado') {
             // Obtener distancia de la ruta y actualizar estadísticas de attendees
@@ -396,6 +460,41 @@ export class EventsService {
         }
 
         return updated;
+    }
+
+    // Publica el cambio de estado en Redis para que el tracker Go lo escuche
+    // (canal event:{id}:status → cierra WS del evento y purga track:*).
+    private async publishEventStatus(eventId: string, status: string): Promise<void> {
+        await this.safeRedis(
+            () => this.redis.publish(
+                `event:${eventId}:status`,
+                JSON.stringify({ type: 'event_status', payload: { eventId, status } }),
+            ),
+            `publish status event ${eventId}`,
+        );
+    }
+
+    // Push FCM a los asistentes cuando la rodada pasa a en_curso, para que
+    // abran el radar (ROD-03). No bloquea la respuesta (fire-and-forget).
+    private async notifyRideStarted(eventId: string, title: string): Promise<void> {
+        const { rows } = await this.db.query<{ fcm_token: string }>(
+            `SELECT u.fcm_token
+             FROM event_attendees a
+             JOIN users u ON u.id = a.user_id
+             WHERE a.event_id = $1 AND u.fcm_token IS NOT NULL`,
+            [eventId],
+        );
+        const tokens = rows.map((r) => r.fcm_token);
+        if (tokens.length === 0) return;
+
+        await this.fcm.sendToTokens(
+            tokens,
+            {
+                title: 'Rodada iniciada',
+                body: `"${title}" está en marcha. Abre el mapa para activar tu radar.`,
+            },
+            { eventId, type: 'ride_started' },
+        );
     }
 
     private async _updateRiderStatsOnCompletion(eventId: string, routeId: string | null): Promise<void> {
@@ -522,9 +621,12 @@ export class EventsService {
             throw e;
         }
 
-        // Autorizar al rider en el tracker en tiempo real.
+        // Autorizar al rider en el tracker en tiempo real (members + rol canónico).
         await this.safeRedis(
-            () => this.redis.sadd(this.eventMembersKey(eventId), userId),
+            () => this.redis.multi()
+                .sadd(this.eventMembersKey(eventId), userId)
+                .hset(this.eventRolesKey(eventId), userId, rideRole)
+                .exec(),
             `sadd member event ${eventId}`,
         );
 
@@ -545,9 +647,12 @@ export class EventsService {
             [eventId, userId],
         );
 
-        // Revocar la autorización del rider en el tracker.
+        // Revocar la autorización del rider en el tracker (members + rol).
         await this.safeRedis(
-            () => this.redis.srem(this.eventMembersKey(eventId), userId),
+            () => this.redis.multi()
+                .srem(this.eventMembersKey(eventId), userId)
+                .hdel(this.eventRolesKey(eventId), userId)
+                .exec(),
             `srem member event ${eventId}`,
         );
 
@@ -580,6 +685,14 @@ export class EventsService {
                 [role, eventId, targetUserId],
             );
             if (!res.rows[0]) throw new NotFoundException('Attendee not found in this event');
+
+            // Reflejar el rol nuevo en el tracker de inmediato (ROD-07):
+            // el radar usa el rol canónico del hash, no el que envía el cliente.
+            await this.safeRedis(
+                () => this.redis.hset(this.eventRolesKey(eventId), targetUserId, role),
+                `hset role event ${eventId}`,
+            );
+
             return res.rows[0];
         } catch (e: unknown) {
             const err = e as { code?: string };
