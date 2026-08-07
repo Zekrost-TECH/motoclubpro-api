@@ -3,6 +3,7 @@ import { BillingService } from './billing.service';
 import { DatabaseService } from '../database/database.service';
 import { AlegraService } from './alegra.service';
 import { WompiService } from './wompi.service';
+import { MailService } from '../notifications/mail.service';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('BillingService', () => {
@@ -10,10 +11,12 @@ describe('BillingService', () => {
     let dbQueryMock: jest.Mock;
     let alegraMock: jest.Mocked<Partial<AlegraService>>;
     let wompiMock: jest.Mocked<Partial<WompiService>>;
+    let mailMock: jest.Mocked<Partial<MailService>>;
 
     beforeEach(async () => {
         dbQueryMock = jest.fn().mockResolvedValue({ rows: [] });
         alegraMock = { generateInvoice: jest.fn().mockResolvedValue(undefined) };
+        mailMock = { sendSubscriptionSuspended: jest.fn().mockResolvedValue(undefined) };
         wompiMock = {
             dryRun: false,
             getAcceptanceToken: jest.fn().mockResolvedValue('acc_tok'),
@@ -33,6 +36,7 @@ describe('BillingService', () => {
                 { provide: DatabaseService, useValue: { query: dbQueryMock, getPool: jest.fn() } },
                 { provide: AlegraService, useValue: alegraMock },
                 { provide: WompiService, useValue: wompiMock },
+                { provide: MailService, useValue: mailMock },
             ],
         }).compile();
 
@@ -123,12 +127,28 @@ describe('BillingService', () => {
 
         it('should suspend subscription after 3 retries', async () => {
             dbQueryMock
-                .mockResolvedValueOnce({ rows: [{ subscription_id: 'sub-1' }] })
+                .mockResolvedValueOnce({ rows: [{ subscription_id: 'sub-1', club_id: 'club-1' }] })
                 .mockResolvedValueOnce({ rows: [{ retry_count: 3, status: 'active' }] })
                 .mockResolvedValueOnce({ rows: [] });
+            // notifySuspension: sin admin → no email
 
             await service.markPaymentFailed('wompi-tx-1', 'ref-1');
-            expect(dbQueryMock).toHaveBeenCalledTimes(3);
+            expect(dbQueryMock).toHaveBeenCalledTimes(4);
+        });
+
+        it('should notify admin by email when subscription is suspended', async () => {
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [{ subscription_id: 'sub-1', club_id: 'club-1' }] })
+                .mockResolvedValueOnce({ rows: [{ retry_count: 3, status: 'active' }] })
+                .mockResolvedValueOnce({ rows: [] }) // UPDATE suspend
+                .mockResolvedValueOnce({ rows: [{ club_name: 'Iron Bikers', email: 'admin@club.co' }] }); // SELECT admin
+
+            await service.markPaymentFailed('wompi-tx-1', 'ref-1');
+
+            expect(mailMock.sendSubscriptionSuspended).toHaveBeenCalledWith({
+                email: 'admin@club.co',
+                clubName: 'Iron Bikers',
+            });
         });
 
         it('should return early if transaction not found', async () => {

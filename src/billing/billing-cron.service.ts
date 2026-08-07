@@ -136,6 +136,50 @@ export class BillingCronService {
     this.logger.log(`Retried ${failed.length} failed payments`);
   }
 
+  @Cron('0 4 * * *')
+  async reconcilePendingTransactions(): Promise<void> {
+    this.logger.log('Starting reconciliation of pending transactions');
+
+    // Si el webhook de Wompi no llegó (raro pero posible), el pago queda
+    // 'pending' para siempre. Este cron consulta el estado real y cierra el
+    // ciclo: APPROVED → confirmPayment, DECLINED/ERROR → markPaymentFailed.
+    const { rows } = await this.db.query<{ id: string; wompi_transaction_id: string; wompi_reference: string }>(
+      `SELECT id, wompi_transaction_id, wompi_reference
+       FROM payment_transactions
+       WHERE status = 'pending'
+         AND wompi_transaction_id IS NOT NULL
+         AND created_at < NOW() - INTERVAL '15 minutes'
+         AND created_at > NOW() - INTERVAL '7 days'`,
+    );
+
+    let reconciled = 0;
+    for (const tx of rows) {
+      try {
+        const state = await this.wompiService.getTransaction(tx.wompi_transaction_id);
+        if (state.status === 'APPROVED') {
+          await this.billingService.confirmPayment(tx.wompi_transaction_id, tx.wompi_reference);
+          reconciled++;
+        } else if (state.status === 'DECLINED' || state.status === 'ERROR') {
+          await this.billingService.markPaymentFailed(
+            tx.wompi_transaction_id,
+            tx.wompi_reference,
+            state.status_message,
+          );
+          reconciled++;
+        } else if (state.status === 'VOIDED') {
+          await this.billingService.handleVoidedTransaction(tx.wompi_transaction_id, tx.wompi_reference);
+          reconciled++;
+        }
+      } catch (err) {
+        this.logger.error(`Reconciliation failed for transaction ${tx.id}`, err);
+      }
+    }
+
+    if (rows.length > 0) {
+      this.logger.log(`Transactions reconciled: ${reconciled}/${rows.length}`);
+    }
+  }
+
   @Cron('0 3 * * *')
   async retryPendingInvoices(): Promise<void> {
     this.logger.log('Starting retry of pending invoices (Alegra)');

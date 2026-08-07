@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { DatabaseService } from '../database/database.service';
 import { AlegraService } from './alegra.service';
 import { WompiService } from './wompi.service';
+import { MailService } from '../notifications/mail.service';
 import { CreatePaymentSourceDto } from './dto/create-payment-source.dto';
 import type {
   TransactionRow,
@@ -21,6 +22,7 @@ export class BillingService {
     private readonly db: DatabaseService,
     private readonly alegraService: AlegraService,
     private readonly wompiService: WompiService,
+    private readonly mailService: MailService,
   ) { }
 
   async attachPaymentSource(
@@ -603,11 +605,11 @@ export class BillingService {
     reference: string,
     statusMessage?: string,
   ): Promise<void> {
-    const { rows } = await this.db.query<Pick<TransactionRow, 'subscription_id'>>(
+    const { rows } = await this.db.query<TransactionRow>(
       `UPDATE payment_transactions
        SET status = 'declined', status_message = $1, wompi_transaction_id = $2
        WHERE wompi_reference = $3
-       RETURNING subscription_id`,
+       RETURNING subscription_id, club_id`,
       [statusMessage ?? null, wompiTransactionId, reference],
     );
 
@@ -616,16 +618,17 @@ export class BillingService {
       return;
     }
 
-    await this.incrementRetryAndMaybeSuspend(rows[0].subscription_id);
+    await this.incrementRetryAndMaybeSuspend(rows[0].subscription_id, rows[0].club_id);
 
     this.logger.log(`Payment marked as failed: ${reference}`);
   }
 
   /**
    * Compartido entre webhook (markPaymentFailed) y cron de reintentos (B-12):
-   * incrementa retry_count de la suscripción y suspende al llegar a 3.
+   * incrementa retry_count de la suscripción y suspende al llegar a 3,
+   * notificando por email al admin/leader del club.
    */
-  async incrementRetryAndMaybeSuspend(subscriptionId: string): Promise<void> {
+  async incrementRetryAndMaybeSuspend(subscriptionId: string, clubId?: string): Promise<void> {
     const { rows: subs } = await this.db.query<SubscriptionRetryRow>(
       `UPDATE club_subscriptions
        SET retry_count = retry_count + 1,
@@ -644,6 +647,37 @@ export class BillingService {
         [subscriptionId],
       );
       this.logger.warn(`Subscription ${subscriptionId} suspended after 3 failed payments`);
+
+      await this.notifySuspension(subscriptionId, clubId);
+    }
+  }
+
+  private async notifySuspension(subscriptionId: string, clubId?: string): Promise<void> {
+    if (!clubId) return;
+    try {
+      const { rows } = await this.db.query<{ club_name: string; email: string }>(
+        `SELECT c.name AS club_name, u.email
+         FROM clubs c
+         JOIN club_members cm ON cm.club_id = c.id
+            AND cm.is_active = TRUE AND cm.role IN ('admin', 'leader')
+         JOIN users u ON u.id = cm.user_id
+         WHERE c.id = $1
+         LIMIT 1`,
+        [clubId],
+      );
+
+      const admin = rows[0];
+      if (!admin) {
+        this.logger.warn(`Sin admin/leader para notificar suspensión de ${subscriptionId}`);
+        return;
+      }
+
+      await this.mailService.sendSubscriptionSuspended({
+        email: admin.email,
+        clubName: admin.club_name,
+      });
+    } catch (err) {
+      this.logger.warn(`No se pudo notificar la suspensión de ${subscriptionId}`, err);
     }
   }
 

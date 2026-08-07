@@ -138,6 +138,32 @@ export class WompiService {
     return data.data?.status ?? null;
   }
 
+  /**
+   * Consulta el estado real de una transacción (usado por el cron de
+   * conciliación cuando el webhook no llegó). GET /transactions/{id}.
+   */
+  async getTransaction(
+    transactionId: string,
+  ): Promise<{ status: string; status_message?: string }> {
+    if (this.dryRun) return { status: 'APPROVED' };
+
+    const res = await fetch(`${this.baseUrl}/transactions/${transactionId}`, {
+      headers: { Authorization: `Bearer ${this.privateKey}` },
+    });
+
+    if (!res.ok) {
+      const error = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      this.logger.error('Wompi get transaction failed', error);
+      throw new HttpException(error, res.status);
+    }
+
+    const data = (await res.json()) as { data?: { status?: string; status_message?: string } };
+    return {
+      status: data.data?.status ?? 'UNKNOWN',
+      status_message: data.data?.status_message,
+    };
+  }
+
   async getMerchantInfo(): Promise<WompiMerchantResponse['data']> {
     if (this.dryRun) {
       return {
