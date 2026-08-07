@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { PoolClient } from 'pg';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../database/database.service';
@@ -71,15 +72,44 @@ export class ClubsService {
 
   async create(data: {
     name: string;
-    slug: string;
+    slug?: string;
     city?: string;
     department?: string;
     ownerUserId: string;
+    ownerEmail?: string;
   }): Promise<ClubRow> {
     const client = await this.db.getPool().connect();
 
     try {
       await client.query('BEGIN');
+
+      // Anti-abuso (onboarding self-service): un usuario no puede crear más de
+      // un club donde sea admin (excepto superadmin).
+      if (data.ownerUserId) {
+        const { rows: ownerRows } = await client.query<{ is_superadmin: boolean }>(
+          `SELECT EXISTS(
+             SELECT 1 FROM users WHERE id = $1 AND role = 'superadmin'
+           ) AS is_superadmin`,
+          [data.ownerUserId],
+        );
+
+        if (!ownerRows[0]?.is_superadmin) {
+          const { rows: ownedRows } = await client.query(
+            `SELECT 1 FROM club_members
+             WHERE user_id = $1 AND role = 'admin' AND is_active = TRUE
+             LIMIT 1`,
+            [data.ownerUserId],
+          );
+          if (ownedRows.length > 0) {
+            await client.query('ROLLBACK');
+            throw new ForbiddenException(
+              'Ya tienes un club creado. Cada usuario puede administrar un solo club.',
+            );
+          }
+        }
+      }
+
+      const slug = await this.ensureUniqueSlug(client, data.slug ?? this.slugify(data.name));
 
       const { rows: clubRows } = await client.query<ClubRow>(
         `INSERT INTO clubs (name, slug, city, department)
@@ -87,7 +117,7 @@ export class ClubsService {
          RETURNING id, name, slug, logo_url, city, department, nit,
                    billing_address, billing_phone, billing_contact_name,
                    billing_contact_email, tax_regime, is_active, created_at`,
-        [data.name, data.slug, data.city ?? null, data.department ?? null],
+        [data.name, slug, data.city ?? null, data.department ?? null],
       );
 
       const club = clubRows[0];
@@ -116,12 +146,43 @@ export class ClubsService {
 
       await client.query('COMMIT');
       await this.rideRolesService.seedDefaults(club.id);
+
+      // Email de bienvenida (fire-and-forget; si SMTP falla no debe romper el alta)
+      if (data.ownerEmail) {
+        await this.mailService.sendWelcomeClub({ email: data.ownerEmail, clubName: club.name })
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.warn(`No se pudo enviar el email de bienvenida: ${message}`);
+          });
+      }
+
       return club;
     } catch (err) {
       await client.query('ROLLBACK').catch(() => { });
       throw err;
     } finally {
       client.release();
+    }
+  }
+
+  private slugify(name: string): string {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'club';
+  }
+
+  private async ensureUniqueSlug(client: PoolClient, base: string): Promise<string> {
+    let slug = base;
+    let suffix = 2;
+    for (;;) {
+      const { rows } = await client.query(`SELECT 1 FROM clubs WHERE slug = $1 LIMIT 1`, [slug]);
+      if (rows.length === 0) return slug;
+      slug = `${base}-${suffix}`;
+      suffix += 1;
     }
   }
 

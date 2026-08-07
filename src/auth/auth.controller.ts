@@ -53,7 +53,15 @@ export class AuthController {
     @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('register')
     @HttpCode(201)
-    async register(@Body() body: RegisterDto): Promise<AuthResponse> {
+    async register(@Body() body: RegisterDto, @Req() req: RequestWithIp): Promise<AuthResponse> {
+        // Turnstile es opcional (la app móvil no lo envía); si viene, se valida.
+        // La landing (self-service) siempre lo envía → protege contra bots.
+        if (body.turnstileToken) {
+            const turnstileValid = await this.turnstileService.verifyToken(body.turnstileToken, req.ip);
+            if (!turnstileValid) {
+                throw new UnauthorizedException('Verificacion de seguridad fallida. Intenta de nuevo.');
+            }
+        }
         return this.authService.register(body);
     }
 

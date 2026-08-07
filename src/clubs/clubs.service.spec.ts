@@ -28,7 +28,7 @@ describe('ClubsService', () => {
                 ClubsService,
                 { provide: DatabaseService, useValue: db },
                 { provide: UsersService, useValue: { findByEmail: jest.fn() } },
-                { provide: MailService, useValue: { sendInvitation: jest.fn().mockResolvedValue(true) } },
+                { provide: MailService, useValue: { sendInvitation: jest.fn().mockResolvedValue(true), sendWelcomeClub: jest.fn().mockResolvedValue(true) } },
                 { provide: RideRolesService, useValue: { seedDefaults: jest.fn().mockResolvedValue(undefined) } },
                 { provide: PlansService, useValue: { assertCanAddMember: jest.fn().mockResolvedValue(undefined), getClubLimits: jest.fn().mockResolvedValue(undefined) } },
             ],
@@ -56,6 +56,83 @@ describe('ClubsService', () => {
             expect(result.id).toBe('club-1');
             expect(client.query).toHaveBeenCalledWith('BEGIN');
             expect(client.query).toHaveBeenCalledWith('COMMIT');
+        });
+
+        it('should reject a second club for a non-superadmin owner', async () => {
+            client.query = jest.fn((query: string) => Promise.resolve({
+                rows: query.includes('role = \'superadmin\'')
+                    ? [{ is_superadmin: false }]
+                    : query.includes('FROM club_members')
+                        ? [{ id: 'existing' }]
+                        : [],
+            }));
+
+            await expect(
+                service.create({ name: 'Otro Club', ownerUserId: 'user-1' }),
+            ).rejects.toThrow(ForbiddenException);
+        });
+
+        it('should allow superadmin to create multiple clubs', async () => {
+            client.query = jest.fn((query: string) => {
+                if (query === 'BEGIN') return { rows: [] };
+                if (query.includes('role = \'superadmin\'')) return { rows: [{ is_superadmin: true }] };
+                if (query.includes('INSERT INTO clubs')) return { rows: [{ id: 'club-2', name: 'Club 2', slug: 'club-2' }] };
+                if (query.includes('INSERT INTO club_members')) return { rows: [] };
+                if (query.includes('SELECT id FROM plans')) return { rows: [{ id: 'prueba' }] };
+                if (query.includes('INSERT INTO club_subscriptions')) return { rows: [] };
+                if (query === 'COMMIT') return { rows: [] };
+                return { rows: [] };
+            });
+
+            const result = await service.create({ name: 'Club 2', ownerUserId: 'super-1' });
+            expect(result.id).toBe('club-2');
+        });
+
+        it('should auto-generate a unique slug when omitted or taken', async () => {
+            const slugsChecked: string[] = [];
+            client.query = jest.fn((query: string) => {
+                if (query === 'BEGIN') return { rows: [] };
+                if (query.includes('role = \'superadmin\'')) return { rows: [{ is_superadmin: true }] };
+                if (query.includes('SELECT 1 FROM clubs WHERE slug')) {
+                    slugsChecked.push(query.match(/\$1/) ? '' : '');
+                    // primera consulta: slug tomado; segunda: libre
+                    return { rows: slugsChecked.length === 1 ? [{ id: 'taken' }] : [] };
+                }
+                if (query.includes('INSERT INTO clubs')) return { rows: [{ id: 'club-3', name: 'Iron Bikers', slug: 'iron-bikers-2' }] };
+                if (query.includes('INSERT INTO club_members')) return { rows: [] };
+                if (query.includes('SELECT id FROM plans')) return { rows: [{ id: 'prueba' }] };
+                if (query.includes('INSERT INTO club_subscriptions')) return { rows: [] };
+                if (query === 'COMMIT') return { rows: [] };
+                return { rows: [] };
+            });
+
+            await service.create({ name: 'Iron Bikers', ownerUserId: 'super-1' });
+
+            const slugQueries = client.query.mock.calls.filter(([q]) => String(q).includes('SELECT 1 FROM clubs WHERE slug'));
+            expect(slugQueries.length).toBeGreaterThanOrEqual(2);
+        });
+
+        it('should send welcome email when ownerEmail is provided', async () => {
+            client.query = jest.fn((query: string) => {
+                if (query === 'BEGIN') return { rows: [] };
+                if (query.includes('role = \'superadmin\'')) return { rows: [{ is_superadmin: true }] };
+                if (query.includes('INSERT INTO clubs')) return { rows: [{ id: 'club-1', name: 'Test Club', slug: 'test' }] };
+                if (query.includes('INSERT INTO club_members')) return { rows: [] };
+                if (query.includes('SELECT id FROM plans')) return { rows: [{ id: 'prueba' }] };
+                if (query.includes('INSERT INTO club_subscriptions')) return { rows: [] };
+                if (query === 'COMMIT') return { rows: [] };
+                return { rows: [] };
+            });
+
+            await service.create({
+                name: 'Test Club', slug: 'test', ownerUserId: 'user-1', ownerEmail: 'owner@example.com',
+            });
+
+            const mailService = (service as any).mailService;
+            expect(mailService.sendWelcomeClub).toHaveBeenCalledWith({
+                email: 'owner@example.com',
+                clubName: 'Test Club',
+            });
         });
     });
 

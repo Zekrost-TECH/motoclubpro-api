@@ -6,9 +6,10 @@ export class CreateClubDto {
     @IsString()
     name!: string;
 
-    @ApiProperty({ description: 'URL-friendly slug' })
+    @ApiPropertyOptional({ description: 'URL-friendly slug (auto-generado si se omite)' })
+    @IsOptional()
     @IsString()
-    slug!: string;
+    slug?: string;
 
     @ApiPropertyOptional({ description: 'City' })
     @IsOptional()

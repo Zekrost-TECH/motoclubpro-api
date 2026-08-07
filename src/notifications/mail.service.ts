@@ -14,6 +14,11 @@ interface SuspensionMailContext {
     reason?: string | null;
 }
 
+interface WelcomeClubMailContext {
+    email: string;
+    clubName: string;
+}
+
 @Injectable()
 export class MailService {
     private readonly logger = new Logger(MailService.name);
@@ -57,6 +62,28 @@ Hola,
 La suscripción de ${ctx.clubName} en BikerOS fue suspendida después de 3 intentos de cobro fallidos${ctx.reason ? ` (motivo: ${ctx.reason})` : ''}.
 
 Para reactivarla, actualiza el método de pago en el panel de administración de tu club.
+
+Saludos,
+Equipo BikerOS
+        `.trim();
+
+        await this.send(ctx.email, subject, body);
+    }
+
+    async sendWelcomeClub(ctx: WelcomeClubMailContext): Promise<void> {
+        const adminUrl = process.env.ADMIN_WEB_URL ?? 'https://admin.bikeros.co';
+        const subject = `Tu club ${ctx.clubName} en BikerOS está listo 🏍️`;
+        const body = `
+Hola,
+
+Tu club "${ctx.clubName}" fue creado en BikerOS y tu prueba gratis de 21 días ya está activa.
+
+Para comenzar:
+1. Ingresa a ${adminUrl} con el correo y la contraseña que registraste.
+2. Invita a los miembros de tu club desde el panel.
+3. Cuando quieras quedarte, elige un plan y paga con tarjeta, Nequi o PSE.
+
+Si recibiste este correo sin haber creado el club, ignóralo: nadie más podrá usar tu correo.
 
 Saludos,
 Equipo BikerOS

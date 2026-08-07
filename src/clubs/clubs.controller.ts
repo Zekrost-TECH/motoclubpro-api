@@ -41,6 +41,7 @@ export class ClubsController {
       city: dto.city,
       department: dto.department,
       ownerUserId: req.user.id,
+      ownerEmail: req.user.email,
     });
   }
 
