@@ -13,6 +13,8 @@ interface RiderStatus {
     role: string;
     userId: string;
     name: string;
+    battery?: number;
+    isCharging?: boolean;
 }
 
 @Injectable()
@@ -40,7 +42,7 @@ export class TrackerService {
      * rider deja de enviar posiciones, su marca desaparezca rápidamente.
      */
     async savePosition(user: AuthUser, dto: CreatePositionDto): Promise<{ saved: boolean }> {
-        const { eventId, lat, lng, speed, heading, timestamp, name } = dto;
+        const { eventId, lat, lng, speed, heading, timestamp, name, battery, is_charging } = dto;
 
         // ROD-08: descartar coordenadas fuera de rango (GPS corrupto/manipulado)
         // antes de contaminar el radar.
@@ -91,6 +93,8 @@ export class TrackerService {
             role: attendee?.ride_role ?? user.role,
             userId: user.id,
             name: name ?? '',
+            battery,
+            isCharging: is_charging,
         };
 
         // 4. Guardar en Redis con TTL

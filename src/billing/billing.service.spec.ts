@@ -22,6 +22,15 @@ describe('BillingService', () => {
             getAcceptanceToken: jest.fn().mockResolvedValue('acc_tok'),
             getPersonalDataAuthToken: jest.fn().mockResolvedValue('pd_auth_tok'),
             getNequiTokenStatus: jest.fn().mockResolvedValue('APPROVED'),
+            getCheckoutConfig: jest.fn().mockImplementation((opts) => ({
+                publicKey: 'pub_key',
+                currency: 'COP',
+                amountInCents: opts.amountInCents,
+                reference: opts.reference,
+                signature: { integrity: 'sig-' + opts.reference },
+                customerData: { email: opts.customerEmail },
+                redirectUrl: opts.redirectUrl,
+            })),
             createPaymentSource: jest.fn().mockResolvedValue({
                 data: { id: 'src_123', type: 'CARD', status: 'AVAILABLE', public_data: { last_four: '4242' } },
             }),
@@ -428,6 +437,48 @@ describe('BillingService', () => {
             const result = await service.changeSubscription('club-1', 'pro', 'monthly');
             expect(result.type).toBe('none');
             expect(wompiMock.createTransaction).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('createCheckout (widget Wompi)', () => {
+        it('should insert pending tx and return widget config with server-side signature', async () => {
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [{ wompi_customer_email: 'club@example.com', billing_contact_email: 'b@example.com' }] }) // club
+                .mockResolvedValueOnce({ rows: [{ id: 'esencial', is_active: true, price_monthly_cents: 7990000, price_yearly_cents: 79900000 }] }) // plan
+                .mockResolvedValueOnce({ rows: [{ id: 'sub-1', current_period_end: new Date('2026-09-01'), billing_cycle: 'monthly', plan_id: 'prueba' }] }) // sub
+                .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // pending check
+                .mockResolvedValueOnce({ rows: [{ member_count: 0, event_count: 0, overage_members: 0, overage_charge_cents: 0 }] }) // usage
+                .mockResolvedValueOnce({ rows: [{ overage_member_cents: 250000 }] }) // overage
+                .mockResolvedValueOnce({ rows: [] }) // insert tx
+                .mockResolvedValueOnce({ rows: [] }); // update sub
+
+            const result = await service.createCheckout('club-1', 'esencial', 'monthly', 'https://admin.bikeros.co/billing/result');
+
+            expect(result.amountInCents).toBe(7990000);
+            expect(result.reference).toContain('MCP-');
+            expect(result.signature.integrity).toBeTruthy();
+            expect(result.redirectUrl).toBe('https://admin.bikeros.co/billing/result');
+            expect(wompiMock.getCheckoutConfig).toHaveBeenCalledWith(
+                expect.objectContaining({ amountInCents: 7990000, customerEmail: 'club@example.com' }),
+            );
+            expect(dbQueryMock).toHaveBeenCalledWith(
+                expect.stringContaining("VALUES ($1, $2, $3, $4, $5, $6, 'COP', 'pending', $7)"),
+                expect.arrayContaining(['esencial']),
+            );
+        });
+
+        it('should reject when club has no email', async () => {
+            dbQueryMock.mockResolvedValueOnce({ rows: [{ wompi_customer_email: null, billing_contact_email: null }] });
+            await expect(service.createCheckout('club-1', 'esencial', 'monthly')).rejects.toThrow(BadRequestException);
+        });
+
+        it('should reject when a pending transaction exists', async () => {
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [{ wompi_customer_email: 'club@example.com', billing_contact_email: null }] })
+                .mockResolvedValueOnce({ rows: [{ id: 'esencial', is_active: true, price_monthly_cents: 7990000, price_yearly_cents: 79900000 }] })
+                .mockResolvedValueOnce({ rows: [{ id: 'sub-1', current_period_end: new Date('2026-09-01'), billing_cycle: 'monthly', plan_id: 'prueba' }] })
+                .mockResolvedValueOnce({ rows: [{ count: 1 }] });
+            await expect(service.createCheckout('club-1', 'esencial', 'monthly')).rejects.toThrow(ConflictException);
         });
     });
 

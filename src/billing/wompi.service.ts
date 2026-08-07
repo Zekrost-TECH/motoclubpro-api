@@ -26,6 +26,11 @@ export class WompiService {
     this.dryRun = this.config.get<string>('BILLING_DRY_RUN') === 'true';
   }
 
+  /** Config pública para tokenizar en el navegador (llave pública + base URL del ambiente). */
+  getPublicConfig(): { publicKey: string; baseUrl: string } {
+    return { publicKey: this.publicKey, baseUrl: this.baseUrl };
+  }
+
   /**
    * Firma de integridad (verificada contra sandbox real):
    * SHA256(referencia + monto_en_centavos + moneda + secreto_integridad)
@@ -161,6 +166,38 @@ export class WompiService {
     return {
       status: data.data?.status ?? 'UNKNOWN',
       status_message: data.data?.status_message,
+    };
+  }
+
+  /**
+   * Config del Widget de Wompi (checkout modal del cliente). La firma de
+   * integridad se calcula AQUÍ en el servidor — la integrity key nunca viaja
+   * al navegador. Verificado contra la doc oficial (widget-checkout-web).
+   */
+  getCheckoutConfig(opts: {
+    amountInCents: number;
+    reference: string;
+    customerEmail: string;
+    redirectUrl?: string;
+  }): {
+    publicKey: string;
+    currency: 'COP';
+    amountInCents: number;
+    reference: string;
+    signature: { integrity: string };
+    customerData: { email: string };
+    redirectUrl?: string;
+  } {
+    return {
+      publicKey: this.publicKey,
+      currency: 'COP',
+      amountInCents: opts.amountInCents,
+      reference: opts.reference,
+      signature: {
+        integrity: this.buildIntegritySignature(opts.reference, opts.amountInCents, 'COP'),
+      },
+      customerData: { email: opts.customerEmail },
+      redirectUrl: opts.redirectUrl,
     };
   }
 

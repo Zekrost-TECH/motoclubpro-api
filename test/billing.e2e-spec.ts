@@ -58,6 +58,10 @@ class FakeDatabase {
             const club = this.clubs.get(params[0] as string);
             return { rows: club ? [{ billing_contact_email: club.billing_contact_email }] as T[] : [] };
         }
+        if (q.includes('SELECT wompi_customer_email, billing_contact_email FROM clubs')) {
+            const club = this.clubs.get(params[0] as string);
+            return { rows: club ? [{ wompi_customer_email: club.wompi_customer_email, billing_contact_email: club.billing_contact_email }] as T[] : [] };
+        }
         if (q.includes('SELECT name FROM clubs')) {
             const club = this.clubs.get(params[0] as string);
             return { rows: club ? [{ name: club.name }] as T[] : [] };
@@ -86,13 +90,16 @@ class FakeDatabase {
             return { rows: [{ count: 0 }] as T[] };
         }
         if (q.includes('INSERT INTO payment_transactions')) {
+            const status = q.includes("'pending'")
+                ? 'pending'
+                : typeof params[4] === 'string' ? params[4] : 'pending';
             const tx = {
                 id: `tx-${this.transactions.length + 1}`,
                 club_id: params[0],
                 subscription_id: params[1],
                 wompi_reference: params[2],
                 wompi_transaction_id: params[3] ?? null,
-                status: params[4] ?? 'pending',
+                status,
                 payment_method: params[5] ?? 'CARD',
                 plan_amount_cents: params[6] ?? 0,
             };
@@ -202,6 +209,8 @@ describe('Billing (e2e, dry-run sin red)', () => {
 
     beforeAll(async () => {
         process.env.BILLING_DRY_RUN = 'true';
+        process.env.WOMPI_PUBLIC_KEY = 'pub_test_e2e';
+        process.env.WOMPI_INTEGRITY_KEY = 'test_integrity_e2e';
 
         // Seed
         db.clubs.set('club-1', {
@@ -251,6 +260,8 @@ describe('Billing (e2e, dry-run sin red)', () => {
     afterAll(async () => {
         await moduleRef.close();
         delete process.env.BILLING_DRY_RUN;
+        delete process.env.WOMPI_PUBLIC_KEY;
+        delete process.env.WOMPI_INTEGRITY_KEY;
     });
 
     it('flujo completo: payment source → checkout → confirmación idempotente → upgrade → downgrade → cancel', async () => {
@@ -299,6 +310,20 @@ describe('Billing (e2e, dry-run sin red)', () => {
         row = [...db.subscriptions.values()][0];
         expect(row.cancel_at_period_end).toBe(true);
         expect(row.cancellation_reason).toBe('e2e');
+    });
+
+    it('checkout widget: devuelve config con firma de integridad y transacción pending', async () => {
+        const config = await billing.createCheckout('club-1', 'esencial', 'monthly', 'https://admin.bikeros.co/billing/result');
+
+        expect(config.publicKey).toBeTruthy();
+        expect(config.amountInCents).toBe(7990000);
+        expect(config.reference).toContain('MCP-');
+        expect(config.signature.integrity).toMatch(/^[a-f0-9]{64}$/);
+        expect(config.customerData.email).toBe('tesorero@ironbikers.co');
+        expect(config.redirectUrl).toBe('https://admin.bikeros.co/billing/result');
+
+        const pending = db.transactions.filter((t) => t.status === 'pending');
+        expect(pending.length).toBe(1);
     });
 
     it('suspende y notifica tras 3 cobros fallidos', async () => {

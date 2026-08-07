@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 import { WompiService } from './wompi.service';
@@ -17,11 +18,17 @@ describe('BillingController', () => {
             attachPaymentSource: jest.fn().mockResolvedValue({ sourceId: 'src_123', type: 'CARD', status: 'AVAILABLE', dryRun: false }),
             clearPaymentSource: jest.fn().mockResolvedValue(undefined),
             createSubscription: jest.fn().mockResolvedValue({ transactionId: 'tx-1', reference: 'MCP-ref-1', status: 'pending', dryRun: false }),
+            createCheckout: jest.fn().mockResolvedValue({
+                publicKey: 'pub_key', currency: 'COP', amountInCents: 7990000,
+                reference: 'MCP-ref-1', signature: { integrity: 'abc' },
+                customerData: { email: 'club@example.com' }, redirectUrl: 'https://admin.bikeros.co/billing/result',
+            }),
             changeSubscription: jest.fn().mockResolvedValue({ type: 'upgrade', amountCents: 500000, reference: 'MCP-CHG-1', pendingPlanId: null, dryRun: false }),
             cancelSubscription: jest.fn().mockResolvedValue(undefined),
         };
         wompiMock = {
             dryRun: false,
+            getPublicConfig: jest.fn().mockReturnValue({ publicKey: 'pub_key', baseUrl: 'https://api.wompi.test' }),
             getMerchantInfo: jest.fn().mockResolvedValue({
                 presigned_acceptance: { acceptance_token: 'acc_tok', permalink: 'https://wompi.co/tos' },
                 acceptance_policies: {},
@@ -34,6 +41,7 @@ describe('BillingController', () => {
                 { provide: DatabaseService, useValue: { query: dbQueryMock } },
                 { provide: BillingService, useValue: billingMock },
                 { provide: WompiService, useValue: wompiMock },
+                { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(undefined) } },
             ],
         }).compile();
 
@@ -60,6 +68,21 @@ describe('BillingController', () => {
 
         it('should reject without club id', async () => {
             await expect(controller.createPaymentSource(null, {} as never)).rejects.toThrow(BadRequestException);
+        });
+    });
+
+    describe('checkout (widget Wompi)', () => {
+        it('should return widget config for club', async () => {
+            const result = await controller.checkout('club-1', { planId: 'esencial', billingCycle: 'monthly' });
+            expect(billingMock.createCheckout).toHaveBeenCalledWith('club-1', 'esencial', 'monthly', undefined);
+            expect(result.signature.integrity).toBe('abc');
+            expect(result.publicKey).toBe('pub_key');
+        });
+
+        it('should reject without club id', async () => {
+            await expect(
+                controller.checkout(null, { planId: 'esencial', billingCycle: 'monthly' }),
+            ).rejects.toThrow(BadRequestException);
         });
     });
 

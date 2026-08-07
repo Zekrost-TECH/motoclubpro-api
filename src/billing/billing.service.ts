@@ -505,6 +505,118 @@ export class BillingService {
     return Math.max(1, Math.round((b.getTime() - a.getTime()) / 86400000));
   }
 
+  /**
+   * Checkout con el Widget de Wompi: NO requiere método de pago guardado
+   * (el widget tokeniza la tarjeta en el navegador para la transacción).
+   * Inserta la transacción pending (para que el webhook la confirme por
+   * referencia), aplica plan/ciclo y devuelve el config del widget con la
+   * firma de integridad calculada en el servidor.
+   */
+  async createCheckout(
+    clubId: string,
+    planId: string,
+    billingCycle: 'monthly' | 'yearly',
+    redirectUrl?: string,
+  ): Promise<{
+    publicKey: string;
+    currency: 'COP';
+    amountInCents: number;
+    reference: string;
+    signature: { integrity: string };
+    customerData: { email: string };
+    redirectUrl?: string;
+  }> {
+    const { rows: clubRows } = await this.db.query<{
+      wompi_customer_email: string | null;
+      billing_contact_email: string | null;
+    }>(
+      `SELECT wompi_customer_email, billing_contact_email FROM clubs WHERE id = $1`,
+      [clubId],
+    );
+
+    const club = clubRows[0];
+    if (!club) throw new NotFoundException('Club no encontrado');
+
+    const customerEmail = club.wompi_customer_email ?? club.billing_contact_email;
+    if (!customerEmail) {
+      throw new BadRequestException(
+        'Se requiere un email del club: guarda el método de pago o el email de facturación primero',
+      );
+    }
+
+    const { rows: planRows } = await this.db.query<{
+      id: string;
+      is_active: boolean;
+      price_monthly_cents: number;
+      price_yearly_cents: number | null;
+    }>(`SELECT id, is_active, price_monthly_cents, price_yearly_cents FROM plans WHERE id = $1`, [planId]);
+
+    const plan = planRows[0];
+    if (!plan || !plan.is_active) {
+      throw new NotFoundException('Plan no encontrado o inactivo');
+    }
+
+    const { rows: subRows } = await this.db.query<SubscriptionRow>(
+      `SELECT id, current_period_end, billing_cycle, plan_id
+       FROM club_subscriptions WHERE club_id = $1`,
+      [clubId],
+    );
+
+    const sub = subRows[0];
+    if (!sub) throw new ConflictException('El club no tiene una suscripción inicial');
+
+    const { rows: pendingRows } = await this.db.query<CountRow>(
+      `SELECT COUNT(*)::int AS count
+       FROM payment_transactions
+       WHERE subscription_id = $1 AND status = 'pending'
+         AND created_at > NOW() - INTERVAL '7 days'`,
+      [sub.id],
+    );
+
+    if ((pendingRows[0]?.count ?? 0) > 0) {
+      throw new ConflictException('Ya existe un pago pendiente para esta suscripción');
+    }
+
+    const priceCents =
+      billingCycle === 'yearly'
+        ? plan.price_yearly_cents ?? plan.price_monthly_cents * 10
+        : plan.price_monthly_cents;
+
+    const periodStart = sub.current_period_end ?? new Date();
+    const usage = await this.calculateMonthlyUsage(clubId, periodStart);
+    const overageCharge = await this.calculateOverageCharge(plan.id, usage.overage_members);
+    const totalCents = priceCents + overageCharge;
+    const reference = `MCP-${clubId}-${Date.now()}`;
+
+    await this.db.query(
+      `INSERT INTO payment_transactions
+       (club_id, subscription_id, wompi_reference, amount_cents, plan_amount_cents,
+        overage_amount_cents, currency, status, plan_id)
+       VALUES ($1, $2, $3, $4, $5, $6, 'COP', 'pending', $7)`,
+      [clubId, sub.id, reference, totalCents, priceCents, overageCharge, planId],
+    );
+
+    if (billingCycle !== sub.billing_cycle || planId !== sub.plan_id) {
+      await this.db.query(
+        `UPDATE club_subscriptions
+         SET plan_id = $2, billing_cycle = $3, pending_plan_id = NULL, updated_at = NOW()
+         WHERE id = $1`,
+        [sub.id, planId, billingCycle],
+      );
+    }
+
+    const config = this.wompiService.getCheckoutConfig({
+      amountInCents: totalCents,
+      reference,
+      customerEmail,
+      redirectUrl,
+    });
+
+    this.logger.log(`Checkout widget preparado para ${clubId}: ${reference} por ${totalCents} COP cents`);
+
+    return config;
+  }
+
   async confirmPayment(wompiTransactionId: string, reference: string): Promise<void> {
     const { rows } = await this.db.query<TransactionRow>(
       `SELECT id, subscription_id, club_id, status, plan_amount_cents, overage_amount_cents

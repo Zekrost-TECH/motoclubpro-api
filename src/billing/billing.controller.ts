@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Logger, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
 import { ClubRolesGuard } from '../auth/guards/club-roles.guard';
@@ -24,6 +25,7 @@ export class BillingController {
         private readonly db: DatabaseService,
         private readonly billingService: BillingService,
         private readonly wompiService: WompiService,
+        private readonly config: ConfigService,
     ) { }
 
     @Get('acceptance-token')
@@ -33,6 +35,7 @@ export class BillingController {
             acceptanceToken: merchant.presigned_acceptance.acceptance_token,
             permalink: merchant.presigned_acceptance.permalink ?? null,
             policies: merchant.acceptance_policies ?? {},
+            ...this.wompiService.getPublicConfig(),
             dryRun: this.wompiService.dryRun,
         };
     }
@@ -54,6 +57,16 @@ export class BillingController {
         }
         await this.billingService.clearPaymentSource(clubId);
         return { ok: true };
+    }
+
+    @Post('checkout')
+    @ClubRoles(UserRole.admin, UserRole.leader)
+    async checkout(@CurrentClub() clubId: string | null, @Body() dto: SubscribeDto) {
+        if (!clubId) {
+            throw new BadRequestException('Club no especificado');
+        }
+        const redirectUrl = this.config.get<string>('BILLING_REDIRECT_URL') ?? undefined;
+        return this.billingService.createCheckout(clubId, dto.planId, dto.billingCycle, redirectUrl);
     }
 
     @Post('subscription')
@@ -134,8 +147,9 @@ export class BillingController {
             `SELECT COUNT(*)::int AS count FROM club_members WHERE club_id = $1 AND is_active = TRUE`,
             [clubId || null],
         );
-        const { rows: paymentRows } = await this.db.query<{ has_source: boolean }>(
-            `SELECT wompi_payment_source_id IS NOT NULL AS has_source FROM clubs WHERE id = $1`,
+        const { rows: paymentRows } = await this.db.query<{ has_source: boolean; last4: string | null }>(
+            `SELECT wompi_payment_source_id IS NOT NULL AS has_source, wompi_payment_last4 AS last4
+             FROM clubs WHERE id = $1`,
             [clubId || null],
         );
         const currentMembers = memberRows[0]?.count ?? 0;
@@ -156,6 +170,7 @@ export class BillingController {
             cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
             retryCount: sub.retry_count ?? 0,
             hasPaymentSource: paymentRows[0]?.has_source ?? false,
+            paymentMethodLast4: paymentRows[0]?.last4 ?? null,
         };
     }
 

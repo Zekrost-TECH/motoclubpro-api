@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsUUID, Min, Max, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePositionDto {
@@ -33,4 +33,16 @@ export class CreatePositionDto {
     @IsOptional()
     @IsString()
     name?: string;
+
+    @ApiPropertyOptional({ description: 'Nivel de batería del dispositivo (0-100)' })
+    @IsOptional()
+    @IsNumber()
+    @Min(0)
+    @Max(100)
+    battery?: number;
+
+    @ApiPropertyOptional({ description: 'Si el dispositivo está cargando' })
+    @IsOptional()
+    @IsBoolean()
+    is_charging?: boolean;
 }
