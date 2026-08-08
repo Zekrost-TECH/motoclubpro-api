@@ -332,6 +332,28 @@ describe('EventsService', () => {
                 expect.objectContaining({ eventId: 'event-1', type: 'ride_started' }),
             );
         });
+
+        it('should notify attendees by FCM when ride ends (ROD-25)', async () => {
+            const draftEvent = { ...mockEvent, status: 'en_curso' };
+            jest.spyOn(service, 'findOne').mockResolvedValue(draftEvent as any);
+            // UPDATE + stats (ruta, attendees, UPDATE users) + notifyRideEnded
+            dbQueryMock
+                .mockResolvedValueOnce({ rows: [{ ...draftEvent, status: 'completado' }] })
+                .mockResolvedValueOnce({ rows: [{ distance_km: 120 }] })      // ruta
+                .mockResolvedValueOnce({ rows: [{ user_id: 'u1' }] })          // attendees stats
+                .mockResolvedValueOnce({ rows: [] })                           // UPDATE users stats
+                .mockResolvedValueOnce({ rows: [{ fcm_token: 'tok-1' }] });    // notifyRideEnded
+
+            await service.updateStatus('event-1', 'completado');
+            await new Promise((r) => setImmediate(r));
+
+            const fcmMock = (service as unknown as { fcm: { sendToTokens: jest.Mock } }).fcm;
+            expect(fcmMock.sendToTokens).toHaveBeenCalledWith(
+                ['tok-1'],
+                expect.objectContaining({ title: 'Rodada terminada' }),
+                expect.objectContaining({ eventId: 'event-1', type: 'ride_ended' }),
+            );
+        });
     });
 
     describe('findActiveAcrossClubs (ROD-15)', () => {

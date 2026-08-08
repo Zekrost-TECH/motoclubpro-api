@@ -457,6 +457,10 @@ export class EventsService {
         if (updated && newStatus === 'completado') {
             // Obtener distancia de la ruta y actualizar estadísticas de attendees
             await this._updateRiderStatsOnCompletion(updated.id, updated.route_id ?? null);
+            // ROD-25: avisar a los riders en background que la rodada terminó.
+            this.notifyRideEnded(updated.id, updated.title).catch((err) => {
+                this.logger.error('Error notificando fin de rodada', err instanceof Error ? err.stack : String(err));
+            });
         }
 
         return updated;
@@ -494,6 +498,29 @@ export class EventsService {
                 body: `"${title}" está en marcha. Abre el mapa para activar tu radar.`,
             },
             { eventId, type: 'ride_started' },
+        );
+    }
+
+    // Push FCM a los asistentes cuando la rodada se completa, para que los
+    // riders en background sepan que terminó (ROD-25). Fire-and-forget.
+    private async notifyRideEnded(eventId: string, title: string): Promise<void> {
+        const { rows } = await this.db.query<{ fcm_token: string }>(
+            `SELECT u.fcm_token
+             FROM event_attendees a
+             JOIN users u ON u.id = a.user_id
+             WHERE a.event_id = $1 AND u.fcm_token IS NOT NULL`,
+            [eventId],
+        );
+        const tokens = rows.map((r) => r.fcm_token);
+        if (tokens.length === 0) return;
+
+        await this.fcm.sendToTokens(
+            tokens,
+            {
+                title: 'Rodada terminada',
+                body: `"${title}" ha terminado. Revisa el resumen de la rodada.`,
+            },
+            { eventId, type: 'ride_ended' },
         );
     }
 

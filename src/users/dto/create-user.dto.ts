@@ -1,19 +1,23 @@
-import { IsString, IsEmail, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsEnum, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../users.types';
 
 export class CreateUserDto {
     @ApiProperty({ description: 'Full name of the user' })
     @IsString()
+    @MinLength(2, { message: 'El nombre debe tener al menos 2 caracteres' })
+    @MaxLength(120, { message: 'El nombre no puede superar 120 caracteres' })
     name!: string;
 
     @ApiProperty({ description: 'Email address' })
-    @IsEmail()
+    @IsEmail({}, { message: 'Correo electrónico inválido' })
     email!: string;
 
     @ApiPropertyOptional({ description: 'Password (required for creation)' })
     @IsOptional()
     @IsString()
+    @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
+    @MaxLength(128, { message: 'La contraseña no puede superar 128 caracteres' })
     password?: string;
 
     @ApiPropertyOptional({ description: 'Nickname or alias' })
