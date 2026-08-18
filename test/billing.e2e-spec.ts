@@ -224,8 +224,8 @@ describe('Billing (e2e, dry-run sin red)', () => {
             wompi_payment_source_status: null,
         });
         db.plans.set('prueba', { id: 'prueba', name: 'Prueba', is_active: true, price_monthly_cents: 0, price_yearly_cents: 0, overage_member_cents: 0, max_members: 15 });
-        db.plans.set('esencial', { id: 'esencial', name: 'Esencial', is_active: true, price_monthly_cents: 7990000, price_yearly_cents: 79900000, overage_member_cents: 250000, max_members: 25 });
-        db.plans.set('pro', { id: 'pro', name: 'Pro', is_active: true, price_monthly_cents: 24990000, price_yearly_cents: 249900000, overage_member_cents: 150000, max_members: 100 });
+        db.plans.set('esencial', { id: 'esencial', name: 'Esencial', is_active: true, price_monthly_cents: 5990000, price_yearly_cents: 59900000, overage_member_cents: 250000, max_members: 25 });
+        db.plans.set('pro', { id: 'pro', name: 'Pro', is_active: true, price_monthly_cents: 21990000, price_yearly_cents: 219900000, overage_member_cents: 150000, max_members: 100 });
         const start = new Date('2026-08-01');
         const end = new Date('2026-09-01');
         db.subscriptions.set('sub-1', {
@@ -316,7 +316,7 @@ describe('Billing (e2e, dry-run sin red)', () => {
         const config = await billing.createCheckout('club-1', 'esencial', 'monthly', 'https://admin.bikeros.co/billing/result');
 
         expect(config.publicKey).toBeTruthy();
-        expect(config.amountInCents).toBe(7990000);
+        expect(config.amountInCents).toBe(5990000);
         expect(config.reference).toContain('MCP-');
         expect(config.signature.integrity).toMatch(/^[a-f0-9]{64}$/);
         expect(config.customerData.email).toBe('tesorero@ironbikers.co');

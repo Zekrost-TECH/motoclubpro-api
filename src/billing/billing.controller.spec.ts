@@ -19,7 +19,7 @@ describe('BillingController', () => {
             clearPaymentSource: jest.fn().mockResolvedValue(undefined),
             createSubscription: jest.fn().mockResolvedValue({ transactionId: 'tx-1', reference: 'MCP-ref-1', status: 'pending', dryRun: false }),
             createCheckout: jest.fn().mockResolvedValue({
-                publicKey: 'pub_key', currency: 'COP', amountInCents: 7990000,
+                publicKey: 'pub_key', currency: 'COP', amountInCents: 5990000,
                 reference: 'MCP-ref-1', signature: { integrity: 'abc' },
                 customerData: { email: 'club@example.com' }, redirectUrl: 'https://admin.bikeros.co/billing/result',
             }),

@@ -369,8 +369,8 @@ describe('BillingService', () => {
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [clubRow] }) // club
                 .mockResolvedValueOnce({ rows: [{ id: 'sub-1', plan_id: 'basico', billing_cycle: 'monthly', current_period_start: new Date('2026-08-01'), current_period_end: new Date('2026-09-01'), pending_plan_id: null }] }) // sub
-                .mockResolvedValueOnce({ rows: [{ id: 'pro', is_active: true, price_monthly_cents: 24990000, price_yearly_cents: 249900000 }] }) // nuevo plan
-                .mockResolvedValueOnce({ rows: [{ price_monthly_cents: 14990000, price_yearly_cents: 149900000 }] }) // precio actual (basico)
+                .mockResolvedValueOnce({ rows: [{ id: 'pro', is_active: true, price_monthly_cents: 21990000, price_yearly_cents: 219900000 }] }) // nuevo plan
+                .mockResolvedValueOnce({ rows: [{ price_monthly_cents: 11990000, price_yearly_cents: 119900000 }] }) // precio actual (basico)
                 .mockResolvedValueOnce({ rows: [] }) // insert tx
                 .mockResolvedValueOnce({ rows: [] }); // update sub
 
@@ -393,8 +393,8 @@ describe('BillingService', () => {
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [clubRow] }) // club
                 .mockResolvedValueOnce({ rows: [{ id: 'sub-1', plan_id: 'pro', billing_cycle: 'monthly', current_period_start: new Date('2026-08-01'), current_period_end: new Date('2026-09-01'), pending_plan_id: null }] }) // sub
-                .mockResolvedValueOnce({ rows: [{ id: 'basico', is_active: true, price_monthly_cents: 14990000, price_yearly_cents: 149900000 }] }) // nuevo plan
-                .mockResolvedValueOnce({ rows: [{ price_monthly_cents: 24990000, price_yearly_cents: 249900000 }] }) // precio actual (pro)
+                .mockResolvedValueOnce({ rows: [{ id: 'basico', is_active: true, price_monthly_cents: 11990000, price_yearly_cents: 119900000 }] }) // nuevo plan
+                .mockResolvedValueOnce({ rows: [{ price_monthly_cents: 21990000, price_yearly_cents: 219900000 }] }) // precio actual (pro)
                 .mockResolvedValueOnce({ rows: [] }); // update pending
 
             const result = await service.changeSubscription('club-1', 'basico', undefined);
@@ -413,8 +413,8 @@ describe('BillingService', () => {
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [clubRow] }) // club
                 .mockResolvedValueOnce({ rows: [{ id: 'sub-1', plan_id: 'esencial', billing_cycle: 'monthly', current_period_start: new Date('2026-08-01'), current_period_end: new Date('2026-09-01'), pending_plan_id: null }] }) // sub
-                .mockResolvedValueOnce({ rows: [{ id: 'esencial', is_active: true, price_monthly_cents: 7990000, price_yearly_cents: 79900000 }] }) // mismo plan
-                .mockResolvedValueOnce({ rows: [{ price_monthly_cents: 7990000, price_yearly_cents: 79900000 }] }) // precio actual
+                .mockResolvedValueOnce({ rows: [{ id: 'esencial', is_active: true, price_monthly_cents: 5990000, price_yearly_cents: 59900000 }] }) // mismo plan
+                .mockResolvedValueOnce({ rows: [{ price_monthly_cents: 5990000, price_yearly_cents: 59900000 }] }) // precio actual
                 .mockResolvedValueOnce({ rows: [] }) // insert tx
                 .mockResolvedValueOnce({ rows: [] }); // update sub
 
@@ -422,7 +422,7 @@ describe('BillingService', () => {
 
             expect(result.type).toBe('cycle');
             expect(result.amountCents).toBeGreaterThan(0);
-            expect(result.amountCents).toBeLessThan(79900000);
+            expect(result.amountCents).toBeLessThan(59900000);
             expect(dbQueryMock).toHaveBeenCalledWith(
                 expect.stringContaining('UPDATE club_subscriptions'),
                 ['sub-1', 'esencial', 'yearly'],
@@ -444,7 +444,7 @@ describe('BillingService', () => {
         it('should insert pending tx and return widget config with server-side signature', async () => {
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [{ wompi_customer_email: 'club@example.com', billing_contact_email: 'b@example.com' }] }) // club
-                .mockResolvedValueOnce({ rows: [{ id: 'esencial', is_active: true, price_monthly_cents: 7990000, price_yearly_cents: 79900000 }] }) // plan
+                .mockResolvedValueOnce({ rows: [{ id: 'esencial', is_active: true, price_monthly_cents: 5990000, price_yearly_cents: 59900000 }] }) // plan
                 .mockResolvedValueOnce({ rows: [{ id: 'sub-1', current_period_end: new Date('2026-09-01'), billing_cycle: 'monthly', plan_id: 'prueba' }] }) // sub
                 .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // pending check
                 .mockResolvedValueOnce({ rows: [{ member_count: 0, event_count: 0, overage_members: 0, overage_charge_cents: 0 }] }) // usage
@@ -454,12 +454,12 @@ describe('BillingService', () => {
 
             const result = await service.createCheckout('club-1', 'esencial', 'monthly', 'https://admin.bikeros.co/billing/result');
 
-            expect(result.amountInCents).toBe(7990000);
+            expect(result.amountInCents).toBe(5990000);
             expect(result.reference).toContain('MCP-');
             expect(result.signature.integrity).toBeTruthy();
             expect(result.redirectUrl).toBe('https://admin.bikeros.co/billing/result');
             expect(wompiMock.getCheckoutConfig).toHaveBeenCalledWith(
-                expect.objectContaining({ amountInCents: 7990000, customerEmail: 'club@example.com' }),
+                expect.objectContaining({ amountInCents: 5990000, customerEmail: 'club@example.com' }),
             );
             expect(dbQueryMock).toHaveBeenCalledWith(
                 expect.stringContaining("VALUES ($1, $2, $3, $4, $5, $6, 'COP', 'pending', $7)"),
@@ -475,7 +475,7 @@ describe('BillingService', () => {
         it('should reject when a pending transaction exists', async () => {
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [{ wompi_customer_email: 'club@example.com', billing_contact_email: null }] })
-                .mockResolvedValueOnce({ rows: [{ id: 'esencial', is_active: true, price_monthly_cents: 7990000, price_yearly_cents: 79900000 }] })
+                .mockResolvedValueOnce({ rows: [{ id: 'esencial', is_active: true, price_monthly_cents: 5990000, price_yearly_cents: 59900000 }] })
                 .mockResolvedValueOnce({ rows: [{ id: 'sub-1', current_period_end: new Date('2026-09-01'), billing_cycle: 'monthly', plan_id: 'prueba' }] })
                 .mockResolvedValueOnce({ rows: [{ count: 1 }] });
             await expect(service.createCheckout('club-1', 'esencial', 'monthly')).rejects.toThrow(ConflictException);
@@ -486,7 +486,7 @@ describe('BillingService', () => {
         it('should create pending transaction and switch plan/cycle', async () => {
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [{ wompi_payment_source_id: 'src_1', wompi_payment_method_type: 'CARD', wompi_customer_email: 'club@example.com', wompi_payment_phone: null, wompi_payment_source_status: 'AVAILABLE' }] }) // club
-                .mockResolvedValueOnce({ rows: [{ id: 'pro', name: 'Pro', is_active: true, price_monthly_cents: 24990000, price_yearly_cents: 249900000 }] }) // plan
+                .mockResolvedValueOnce({ rows: [{ id: 'pro', name: 'Pro', is_active: true, price_monthly_cents: 21990000, price_yearly_cents: 219900000 }] }) // plan
                 .mockResolvedValueOnce({ rows: [{ id: 'sub-1', current_period_end: new Date('2026-08-01'), billing_cycle: 'monthly', plan_id: 'prueba' }] }) // sub
                 .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // pending check
                 .mockResolvedValueOnce({ rows: [{ member_count: 0, event_count: 0, overage_members: 0 }] }) // usage
@@ -499,7 +499,7 @@ describe('BillingService', () => {
             expect(result.status).toBe('pending');
             expect(wompiMock.createTransaction).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    amount_in_cents: 249900000,
+                    amount_in_cents: 219900000,
                     payment_source_id: 'src_1',
                     payment_method: { type: 'CARD', installments: 1 },
                 }),
@@ -513,7 +513,7 @@ describe('BillingService', () => {
         it('should charge NEQUI with phone_number', async () => {
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [{ wompi_payment_source_id: 'src_1', wompi_payment_method_type: 'NEQUI', wompi_customer_email: 'club@example.com', wompi_payment_phone: '3001234567', wompi_payment_source_status: 'AVAILABLE' }] }) // club
-                .mockResolvedValueOnce({ rows: [{ id: 'esencial', name: 'Esencial', is_active: true, price_monthly_cents: 7990000, price_yearly_cents: 79900000 }] }) // plan
+                .mockResolvedValueOnce({ rows: [{ id: 'esencial', name: 'Esencial', is_active: true, price_monthly_cents: 5990000, price_yearly_cents: 59900000 }] }) // plan
                 .mockResolvedValueOnce({ rows: [{ id: 'sub-1', current_period_end: new Date('2026-08-01'), billing_cycle: 'monthly', plan_id: 'prueba' }] }) // sub
                 .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // pending check
                 .mockResolvedValueOnce({ rows: [{ member_count: 0, event_count: 0, overage_members: 0 }] }) // usage
@@ -554,7 +554,7 @@ describe('BillingService', () => {
         it('should reject when a pending transaction already exists', async () => {
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [{ wompi_payment_source_id: 'src_1', wompi_payment_method_type: 'CARD', wompi_customer_email: 'club@example.com', wompi_payment_phone: null, wompi_payment_source_status: 'AVAILABLE' }] })
-                .mockResolvedValueOnce({ rows: [{ id: 'pro', name: 'Pro', is_active: true, price_monthly_cents: 24990000, price_yearly_cents: 249900000 }] })
+                .mockResolvedValueOnce({ rows: [{ id: 'pro', name: 'Pro', is_active: true, price_monthly_cents: 21990000, price_yearly_cents: 219900000 }] })
                 .mockResolvedValueOnce({ rows: [{ id: 'sub-1', current_period_end: new Date('2026-08-01'), billing_cycle: 'monthly', plan_id: 'prueba' }] })
                 .mockResolvedValueOnce({ rows: [{ count: 1 }] });
             await expect(service.createSubscription('club-1', 'pro', 'monthly')).rejects.toThrow(ConflictException);
@@ -566,7 +566,7 @@ describe('BillingService', () => {
 
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [{ wompi_payment_source_id: 'src_1', wompi_payment_method_type: 'CARD', wompi_customer_email: 'club@example.com', wompi_payment_phone: null, wompi_payment_source_status: 'AVAILABLE' }] })
-                .mockResolvedValueOnce({ rows: [{ id: 'pro', name: 'Pro', is_active: true, price_monthly_cents: 24990000, price_yearly_cents: 249900000 }] })
+                .mockResolvedValueOnce({ rows: [{ id: 'pro', name: 'Pro', is_active: true, price_monthly_cents: 21990000, price_yearly_cents: 219900000 }] })
                 .mockResolvedValueOnce({ rows: [{ id: 'sub-1', current_period_end: new Date('2026-08-01'), billing_cycle: 'monthly', plan_id: 'prueba' }] })
                 .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // pending check
                 .mockResolvedValueOnce({ rows: [{ member_count: 0, event_count: 0, overage_members: 0 }] }) // usage

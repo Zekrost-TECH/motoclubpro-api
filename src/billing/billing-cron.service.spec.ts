@@ -124,7 +124,7 @@ describe('BillingCronService', () => {
         });
 
         it('should materialize downgrade pending_plan_id when charging', async () => {
-            const pendingSub = { ...sub, plan_id: 'basico', pending_plan_id: 'esencial', price_cents: 7990000 };
+            const pendingSub = { ...sub, plan_id: 'basico', pending_plan_id: 'esencial', price_cents: 5990000 };
             dbQueryMock
                 .mockResolvedValueOnce({ rows: [pendingSub] })
                 .mockResolvedValueOnce({ rows: [] }); // cancelados
