@@ -768,13 +768,16 @@ export class EventsService {
 
     async respondChecklist(eventId: string, userId: string, responses: { itemId: string; checked: boolean }[], clubId?: string): Promise<{ success: boolean; checklist_completed: boolean }> {
         await this.verifyEventClub(eventId, clubId);
-        // Bulk insert/update logic
-        for (const r of responses) {
+        // Bulk insert/update all responses in a single query using unnest
+        if (responses.length > 0) {
+            const itemIds = responses.map((r) => r.itemId);
+            const checkedValues = responses.map((r) => r.checked);
             await this.db.query(
                 `INSERT INTO checklist_responses (item_id, user_id, event_id, checked)
-         VALUES ($1, $2, $3, $4)
+         SELECT * FROM unnest($1::uuid[], $2::boolean[])
+         JOIN LATERAL (SELECT $3::uuid AS user_id, $4::uuid AS event_id) AS params ON true
          ON CONFLICT (item_id, user_id, event_id) DO UPDATE SET checked = EXCLUDED.checked`,
-                [r.itemId, userId, eventId, r.checked],
+                [itemIds, checkedValues, userId, eventId],
             );
         }
 
