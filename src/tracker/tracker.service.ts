@@ -28,6 +28,16 @@ export class TrackerService {
         return `track:${eventId}:${userId}`;
     }
 
+    private eventCacheKey(eventId: string): string {
+        return `track:event:${eventId}`;
+    }
+
+    private attendeeCacheKey(eventId: string, userId: string): string {
+        return `track:attendee:${eventId}:${userId}`;
+    }
+
+    private static readonly CACHE_TTL = 30; // seconds
+
     private positionTTL(): number {
         // 90 segundos por defecto: en carretera la señal se cae con frecuencia.
         // Un TTL de 30s hacía que un rider desapareciera del radar tras un
@@ -53,12 +63,22 @@ export class TrackerService {
             throw new BadRequestException('Velocidad fuera de rango');
         }
 
-        // 1. Verificar que el evento existe y está en curso
-        const eventRes = await this.db.query(
-            `SELECT id, status, club_id FROM events WHERE id = $1`,
-            [eventId],
-        );
-        const event = eventRes.rows[0];
+        // 1. Verificar que el evento existe y está en curso (con cache Redis)
+        const eventCacheKey = this.eventCacheKey(eventId);
+        let event: { id: string; status: string; club_id: string } | undefined;
+        const cachedEvent = await this.redis.get(eventCacheKey);
+        if (cachedEvent) {
+            event = JSON.parse(cachedEvent) as { id: string; status: string; club_id: string };
+        } else {
+            const eventRes = await this.db.query<{ id: string; status: string; club_id: string }>(
+                `SELECT id, status, club_id FROM events WHERE id = $1`,
+                [eventId],
+            );
+            event = eventRes.rows[0];
+            if (event) {
+                await this.redis.set(eventCacheKey, JSON.stringify(event), 'EX', TrackerService.CACHE_TTL);
+            }
+        }
         if (!event) {
             throw new NotFoundException('Evento no encontrado');
         }
@@ -70,12 +90,20 @@ export class TrackerService {
         // También recuperamos su ride_role operativo (puntero, barredora, ...)
         // para que el radar muestre el rol real de la rodada, no el rol del
         // sistema (admin/leader/rider).
-        const attendeeRes = await this.db.query<{ ride_role: string }>(
-            `SELECT ride_role FROM event_attendees WHERE event_id = $1 AND user_id = $2 LIMIT 1`,
-            [eventId, user.id],
-        );
-        const attendee = attendeeRes.rows[0];
-        const isAttendee = !!attendee;
+        let attendee: { ride_role: string } | undefined;
+        const attendeeCacheKey = this.attendeeCacheKey(eventId, user.id);
+        const cachedAttendee = await this.redis.get(attendeeCacheKey);
+        if (cachedAttendee) {
+            attendee = JSON.parse(cachedAttendee) as { ride_role: string };
+        } else {
+            const attendeeRes = await this.db.query<{ ride_role: string }>(
+                `SELECT ride_role FROM event_attendees WHERE event_id = $1 AND user_id = $2 LIMIT 1`,
+                [eventId, user.id],
+            );
+            attendee = attendeeRes.rows[0];
+            await this.redis.set(attendeeCacheKey, JSON.stringify(attendee ?? { ride_role: '' }), 'EX', TrackerService.CACHE_TTL);
+        }
+        const isAttendee = !!(attendee && attendee.ride_role);
         const isManager = user.role === 'admin' || user.role === 'leader' || user.role === 'superadmin';
         if (!isAttendee && !isManager) {
             throw new UnauthorizedException('No estás autorizado para este evento');

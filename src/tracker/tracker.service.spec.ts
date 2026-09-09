@@ -6,11 +6,11 @@ import { NotFoundException, ForbiddenException, UnauthorizedException, BadReques
 describe('TrackerService', () => {
     let service: TrackerService;
     let dbQueryMock: jest.Mock;
-    let redisMock: { set: jest.Mock };
+    let redisMock: { get: jest.Mock; set: jest.Mock };
 
     beforeEach(async () => {
         dbQueryMock = jest.fn().mockResolvedValue({ rows: [] });
-        redisMock = { set: jest.fn().mockResolvedValue('OK') };
+        redisMock = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue('OK') };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -61,7 +61,7 @@ describe('TrackerService', () => {
                 timestamp: 1234, name: 'Juan', battery: 67, is_charging: true,
             } as never);
 
-            const [key, value] = redisMock.set.mock.calls[0];
+            const [key, value] = redisMock.set.mock.calls[2];
             expect(key).toBe('track:e1:user-1');
             const parsed = JSON.parse(value);
             expect(parsed).toMatchObject({
