@@ -20,27 +20,83 @@ process.on('uncaughtException', (err) => {
 });
 
 function validateEnv(config: ConfigService): void {
+  const errors: string[] = [];
+  const isProduction = config.get<string>('NODE_ENV') === 'production';
   const dryRun = config.get<string>('BILLING_DRY_RUN') === 'true';
-  const billingKeys = [
-    'WOMPI_PRIVATE_KEY',
-    'WOMPI_PUBLIC_KEY',
-    'WOMPI_BASE_URL',
-    'WOMPI_EVENTS_SECRET',
-    'ALEGRA_EMAIL',
-    'ALEGRA_API_KEY',
-    'ALEGRA_BASE_URL',
-  ];
+
+  // --- Required vars (all environments) ---
   const required = [
     'DATABASE_URL',
     'JWT_SECRET',
     'REFRESH_SECRET',
     'REDIS_URL',
-    ...(dryRun ? [] : billingKeys),
   ];
-  const missing = required.filter((key) => !config.get<string>(key));
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  for (const key of required) {
+    if (!config.get<string>(key)) {
+      errors.push(`Missing required environment variable: ${key}`);
+    }
   }
+
+  // --- Format: DATABASE_URL ---
+  const dbUrl = config.get<string>('DATABASE_URL');
+  if (dbUrl && !dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+    errors.push('DATABASE_URL must start with postgresql:// or postgres://');
+  }
+
+  // --- Format: REDIS_URL ---
+  const redisUrl = config.get<string>('REDIS_URL');
+  if (redisUrl && !redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://')) {
+    errors.push('REDIS_URL must start with redis:// or rediss://');
+  }
+
+  // --- Min length: JWT_SECRET (32 chars) ---
+  const jwtSecret = config.get<string>('JWT_SECRET');
+  if (jwtSecret && jwtSecret.length < 32) {
+    errors.push('JWT_SECRET must be at least 32 characters');
+  }
+
+  // --- Min length: REFRESH_SECRET (32 chars) ---
+  const refreshSecret = config.get<string>('REFRESH_SECRET');
+  if (refreshSecret && refreshSecret.length < 32) {
+    errors.push('REFRESH_SECRET must be at least 32 characters');
+  }
+
+  // --- Format: PORT (numeric, if present) ---
+  const port = config.get<string>('PORT');
+  if (port && !/^\d+$/.test(port)) {
+    errors.push('PORT must be a numeric value');
+  }
+
+  // --- Production-only: ALLOWED_ORIGINS ---
+  if (isProduction) {
+    const origins = (config.get<string>('ALLOWED_ORIGINS') ?? '').trim();
+    if (!origins) {
+      errors.push('ALLOWED_ORIGINS is required in production');
+    }
+  }
+
+  // --- Billing keys (only when not dry-run) ---
+  if (!dryRun) {
+    const billingKeys = [
+      'WOMPI_PRIVATE_KEY',
+      'WOMPI_PUBLIC_KEY',
+      'WOMPI_BASE_URL',
+      'WOMPI_EVENTS_SECRET',
+      'ALEGRA_EMAIL',
+      'ALEGRA_API_KEY',
+      'ALEGRA_BASE_URL',
+    ];
+    for (const key of billingKeys) {
+      if (!config.get<string>(key)) {
+        errors.push(`Missing required environment variable: ${key}`);
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Environment validation failed:\n  - ${errors.join('\n  - ')}`);
+  }
+
   if (dryRun) {
     Logger.warn('BILLING_DRY_RUN activo: pagos y facturacion se simulan sin Wompi/Alegra', 'Bootstrap');
   }
