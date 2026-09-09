@@ -21,11 +21,17 @@ describe('buildCorsOriginValidator', () => {
         expect(r.allow).toBe(true);
     });
 
-    it('should allow Capacitor origins', () => {
-        for (const o of ['capacitor://localhost', 'https://localhost', 'http://localhost', 'http://10.0.2.2:5173']) {
+    it('should allow Capacitor origin (hardcoded)', () => {
+        const r = check('capacitor://localhost');
+        expect(r.err).toBeNull();
+        expect(r.allow).toBe(true);
+    });
+
+    it('should reject dev origins not in allowlist', () => {
+        for (const o of ['https://localhost', 'http://localhost', 'http://10.0.2.2:5173']) {
             const r = check(o);
-            expect(r.err).toBeNull();
-            expect(r.allow).toBe(true);
+            expect(r.err).not.toBeNull();
+            expect(r.allow).toBe(false);
         }
     });
 

@@ -19,7 +19,7 @@ describe('CORS middleware (e2e)', () => {
         app.enableCors({
             origin: (origin, callback) => {
                 const allowed = new Set(['https://bikeros.co', 'https://admin.bikeros.co']);
-                const capacitor = new Set(['capacitor://localhost', 'https://localhost', 'http://localhost', 'http://10.0.2.2:5173']);
+                const capacitor = new Set(['capacitor://localhost']);
                 if (!origin) { callback(null, true); return; }
                 if (capacitor.has(origin) || allowed.has(origin)) { callback(null, true); return; }
                 callback(new Error(`CORS bloqueado: ${origin}`), false);

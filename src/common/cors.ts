@@ -8,12 +8,14 @@
 // válido independientemente del origen.
 //
 // Requests CON Origin deben estar en la allowlist o se bloquean con error.
+//
+// capacitor://localhost es el scheme de la app móvil en producción.
+// Se mantiene hardcodeado porque es un scheme custom que no se puede
+// configurar fácilmente en ALLOWED_ORIGINS. Los orígenes de desarrollo
+// (http://localhost, http://10.0.2.2:*) deben estar en ALLOWED_ORIGINS.
 
 const CAPACITOR_ORIGINS = new Set([
     'capacitor://localhost',
-    'https://localhost',
-    'http://localhost',
-    'http://10.0.2.2:5173',
 ]);
 
 type CorsOriginValue = string | boolean | RegExp;
