@@ -541,15 +541,16 @@ export class EventsService {
             [eventId],
         );
 
-        // Actualizar estadísticas de cada rider
-        for (const attendee of attendees) {
+        // Actualizar estadísticas de todos los riders en un solo UPDATE masivo
+        if (attendees.length > 0) {
             await this.db.query(
-                `UPDATE users
-                 SET rides_completed = rides_completed + 1,
-                     total_km = total_km + $1,
+                `UPDATE users u
+                 SET rides_completed = u.rides_completed + 1,
+                     total_km = u.total_km + $1,
                      updated_at = NOW()
-                 WHERE id = $2`,
-                [distanceKm, attendee.user_id],
+                 FROM event_attendees ea
+                 WHERE ea.event_id = $2 AND ea.user_id = u.id`,
+                [distanceKm, eventId],
             );
         }
     }
