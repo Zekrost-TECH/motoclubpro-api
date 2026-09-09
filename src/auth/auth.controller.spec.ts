@@ -60,12 +60,12 @@ describe('AuthController', () => {
     describe('refresh', () => {
         it('should return new tokens', async () => {
             authService.refresh.mockResolvedValue({ access_token: 'new-at', refresh_token: 'new-rt' } as never);
-            const result = await controller.refresh('old-rt');
+            const result = await controller.refresh({ refresh_token: 'old-rt' });
             expect(result.access_token).toBe('new-at');
         });
 
         it('should throw if refresh token is missing', async () => {
-            await expect(controller.refresh('')).rejects.toThrow(UnauthorizedException);
+            await expect(controller.refresh({ refresh_token: '' })).rejects.toThrow(UnauthorizedException);
         });
     });
 

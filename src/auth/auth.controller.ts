@@ -9,6 +9,8 @@ import { TurnstileService } from '../turnstile/turnstile.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import { SwitchClubDto } from './dto/switch-club.dto';
 import type { AuthRequest, AuthResponse } from './auth.types';
 
 interface RequestWithIp {
@@ -68,9 +70,9 @@ export class AuthController {
     @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('refresh')
     @HttpCode(200)
-    async refresh(@Body('refresh_token') refreshToken: string): Promise<Pick<AuthResponse, 'access_token' | 'refresh_token'>> {
-        if (!refreshToken) throw new UnauthorizedException('El refresh token es obligatorio');
-        return this.authService.refresh(refreshToken);
+    async refresh(@Body() dto: RefreshDto): Promise<Pick<AuthResponse, 'access_token' | 'refresh_token'>> {
+        if (!dto.refresh_token) throw new UnauthorizedException('El refresh token es obligatorio');
+        return this.authService.refresh(dto.refresh_token);
     }
 
     @Post('logout')
@@ -100,8 +102,8 @@ export class AuthController {
     @Post('switch-club')
     @UseGuards(JwtAuthGuard)
     @HttpCode(200)
-    async switchClub(@Request() req: AuthRequest, @Body('club_id') clubId: string): Promise<{ access_token: string; refresh_token: string }> {
-        if (!clubId) throw new ForbiddenException('El campo club_id es obligatorio');
-        return this.authService.switchClub(req.user.id, clubId);
+    async switchClub(@Request() req: AuthRequest, @Body() dto: SwitchClubDto): Promise<{ access_token: string; refresh_token: string }> {
+        if (!dto.club_id) throw new ForbiddenException('El campo club_id es obligatorio');
+        return this.authService.switchClub(req.user.id, dto.club_id);
     }
 }

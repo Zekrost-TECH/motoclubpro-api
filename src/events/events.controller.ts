@@ -11,6 +11,7 @@ import {
     Request,
     Query,
     ForbiddenException,
+    ParseArrayPipe,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { EventsService, type EventRow, type AttendeeRow, type InventoryRow, type ChecklistItemRow, type GuestRow } from './events.service';
@@ -23,6 +24,8 @@ import { UpdateAttendeeRoleDto } from './dto/update-attendee-role.dto';
 import { CreateEventGuestDto } from './dto/create-event-guest.dto';
 import { UpdateEventGuestDto } from './dto/update-event-guest.dto';
 import { FindEventsQueryDto } from './dto/find-events-query.dto';
+import { RespondChecklistItemDto } from './dto/respond-checklist.dto';
+import { RsvpDto } from './dto/rsvp.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { EventCaptainGuard } from './guards/event-captain.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
@@ -90,8 +93,8 @@ export class EventsController {
 
     // --- RSVP ---
     @Post(':id/rsvp')
-    rsvp(@Param('id') id: string, @Request() req: AuthRequest, @Body('rideRole') rideRole?: string, @CurrentClub() clubId?: string): Promise<{ success: boolean; message: string }> {
-        return this.eventsService.rsvp(id, req.user, rideRole, clubId);
+    rsvp(@Param('id') id: string, @Request() req: AuthRequest, @Body() dto: RsvpDto, @CurrentClub() clubId?: string): Promise<{ success: boolean; message: string }> {
+        return this.eventsService.rsvp(id, req.user, dto.rideRole, clubId);
     }
 
     @Delete(':id/rsvp')
@@ -150,7 +153,7 @@ export class EventsController {
     respondChecklist(
         @Param('id') id: string,
         @Request() req: AuthRequest,
-        @Body() responses: { itemId: string; checked: boolean }[],
+        @Body(new ParseArrayPipe({ items: RespondChecklistItemDto })) responses: RespondChecklistItemDto[],
         @CurrentClub() clubId?: string,
     ): Promise<{ success: boolean; checklist_completed: boolean }> {
         return this.eventsService.respondChecklist(id, req.user.id, responses, clubId);

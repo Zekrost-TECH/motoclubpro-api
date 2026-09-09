@@ -131,7 +131,7 @@ describe('EventsController', () => {
     describe('rsvp', () => {
         it('should RSVP to event', async () => {
             const req = { user: { id: 'user-1', role: 'rider' } } as any;
-            const result = await controller.rsvp('event-1', req, 'rider', 'club-1');
+            const result = await controller.rsvp('event-1', req, { rideRole: 'rider' }, 'club-1');
             expect(result.success).toBe(true);
             expect(serviceMock.rsvp).toHaveBeenCalledWith('event-1', req.user, 'rider', 'club-1');
         });

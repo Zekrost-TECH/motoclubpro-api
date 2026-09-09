@@ -17,6 +17,7 @@ import type { ClubRow, PublicClubRow, MemberRow, SubscriptionRow } from './clubs
 import { CreateClubDto } from './dto/create-club.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
+import { UpdateClubDto } from './dto/update-club.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ClubMemberGuard } from './guards/club-member.guard';
@@ -92,7 +93,7 @@ export class ClubsController {
   @Patch(':id')
   @UseGuards(ClubMemberGuard, ClubMemberRolesGuard)
   @ClubRoles(UserRole.admin, UserRole.leader)
-  async updateClub(@Param('id') clubId: string, @Body() dto: { name?: string; city?: string; department?: string; description?: string }): Promise<ClubRow> {
+  async updateClub(@Param('id') clubId: string, @Body() dto: UpdateClubDto): Promise<ClubRow> {
     return this.clubsService.update(clubId, dto);
   }
 

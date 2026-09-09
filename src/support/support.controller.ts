@@ -4,6 +4,7 @@ import { SupportService, type SupportPointRow, type SupportPointSummary, type Su
 import { CreateSupportDto, SupportType } from './dto/create-support.dto';
 import { UpdateSupportDto } from './dto/update-support.dto';
 import { ReviewSupportDto } from './dto/review-support.dto';
+import { VerifySupportPointDto } from './dto/verify-support.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
 import { ClubRolesGuard } from '../auth/guards/club-roles.guard';
@@ -54,8 +55,8 @@ export class SupportController {
 
     @Patch(':id/verify')
     @ClubRoles(UserRole.admin, UserRole.leader)
-    async verify(@Param('id') id: string, @Body() body: { verified: boolean }, @CurrentClub() clubId?: string): Promise<SupportPointVerify> {
-        return await this.supportService.verify(id, body.verified, clubId);
+    async verify(@Param('id') id: string, @Body() dto: VerifySupportPointDto, @CurrentClub() clubId?: string): Promise<SupportPointVerify> {
+        return await this.supportService.verify(id, dto.verified, clubId);
     }
 
     @Post(':id/review')
