@@ -80,7 +80,13 @@ cp .env.example .env
 # Editar .env con tus credenciales
 
 # Base de datos (crear DB y ejecutar migraciones)
-# Ver biker-os-api/infra/ para scripts SQL
+# 1. Schema completo (desde cero):
+psql $DATABASE_URL -f src/infra/schema-final.sql
+# 2. Migraciones incrementales (sobre BD existente):
+npm run migrate
+# Ver estado de migraciones:
+npm run migrate:status
+# Ver migrations/README.md para mas detalle
 
 # Desarrollo con hot-reload
 bun run start:dev
@@ -98,6 +104,8 @@ bun run lint           # ESLint
 bun run test           # Unit tests (Jest)
 bun run test:e2e       # End-to-end tests
 bun run test:cov       # Coverage report
+bun run migrate        # Ejecutar migraciones pendientes
+bun run migrate:status # Ver estado de migraciones
 ```
 
 ## Variables de Entorno
