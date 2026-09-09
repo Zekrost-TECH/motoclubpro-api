@@ -45,7 +45,8 @@ export interface SupportPointReview {
 export class SupportService {
   constructor(private rawDb: DatabaseService) { }
 
-  async findAll(clubId?: string): Promise<SupportPointRow[]> {
+  async findAll(clubId?: string, page = 1, limit = 20): Promise<{ data: SupportPointRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+    const offset = (page - 1) * limit;
     let sql = `
       SELECT id, name, type, city, address, phone, hours, rating, review_count, verified,
              ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng,
@@ -57,9 +58,23 @@ export class SupportService {
       sql += ' AND club_id = $1';
       params.push(clubId);
     }
-    sql += ' ORDER BY name LIMIT 100;';
+    sql += ' ORDER BY name LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    params.push(limit as unknown as string, offset as unknown as string);
     const result = await this.rawDb.query<SupportPointRow>(sql, params);
-    return result.rows;
+
+    let countSql = 'SELECT COUNT(*)::int as count FROM support_points WHERE 1=1';
+    const countParams: (string | null)[] = [];
+    if (clubId) {
+      countSql += ' AND club_id = $1';
+      countParams.push(clubId);
+    }
+    const countResult = await this.rawDb.query<{ count: number }>(countSql, countParams);
+    const total = countResult.rows[0]?.count ?? 0;
+
+    return {
+      data: result.rows,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) || 1 },
+    };
   }
 
   async search(lat: number, lng: number, radiusMs: number, type?: SupportType, clubId?: string): Promise<SupportPointRow[]> {

@@ -5,6 +5,7 @@ import { CreateSupportDto, SupportType } from './dto/create-support.dto';
 import { UpdateSupportDto } from './dto/update-support.dto';
 import { ReviewSupportDto } from './dto/review-support.dto';
 import { VerifySupportPointDto } from './dto/verify-support.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
 import { ClubRolesGuard } from '../auth/guards/club-roles.guard';
@@ -26,14 +27,15 @@ export class SupportController {
         @Query('radius') radius?: string,
         @Query('type') type?: SupportType,
         @CurrentClub() clubId?: string,
-    ): Promise<SupportPointRow[]> {
+        @Query() pagination?: PaginationDto,
+    ): Promise<SupportPointRow[] | { data: SupportPointRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
         const latNum = lat ? parseFloat(lat) : NaN;
         const lngNum = lng ? parseFloat(lng) : NaN;
         const radiusNum = radius ? parseFloat(radius) : NaN;
         if (Number.isFinite(latNum) && Number.isFinite(lngNum) && Number.isFinite(radiusNum)) {
             return await this.supportService.search(latNum, lngNum, radiusNum, type, clubId);
         }
-        return await this.supportService.findAll(clubId);
+        return await this.supportService.findAll(clubId, pagination?.page, pagination?.limit);
     }
 
     @Get(':id')

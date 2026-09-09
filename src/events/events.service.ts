@@ -340,7 +340,8 @@ export class EventsService {
                AND cm.user_id = $1
                AND cm.is_active = TRUE
                AND e.club_id IS NOT NULL
-             ORDER BY e.date ASC, e.time ASC`,
+             ORDER BY e.date ASC, e.time ASC
+             LIMIT 50`,
             [userId],
         );
         await this._attachDetails(res.rows);
