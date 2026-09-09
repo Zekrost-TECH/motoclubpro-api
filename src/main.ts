@@ -6,6 +6,7 @@ import {
 import { ValidationPipe, VersioningType, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from '@fastify/helmet';
 import { AppModule } from './app.module';
 import { DatabaseExceptionFilter } from './database/database-exception.filter';
 import { buildCorsOriginValidator } from './common/cors';
@@ -113,6 +114,20 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   validateEnv(configService);
+
+  // Security headers (Helmet)
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: [`'self'`],
+        scriptSrc: [`'self'`, `'unsafe-inline'`],
+        styleSrc: [`'self'`, `'unsafe-inline'`],
+        imgSrc: [`'self'`, 'data:', 'https:'],
+        connectSrc: [`'self'`, 'https:', 'wss:'],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  });
 
   app.useGlobalFilters(new DatabaseExceptionFilter());
 

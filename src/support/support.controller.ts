@@ -56,7 +56,7 @@ export class SupportController {
     @Patch(':id/verify')
     @ClubRoles(UserRole.admin, UserRole.leader)
     async verify(@Param('id') id: string, @Body() dto: VerifySupportPointDto, @CurrentClub() clubId?: string): Promise<SupportPointVerify> {
-        return await this.supportService.verify(id, dto.verified, clubId);
+        return await this.supportService.verify(id, dto.verified ?? true, clubId);
     }
 
     @Post(':id/review')

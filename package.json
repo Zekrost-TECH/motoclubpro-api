@@ -20,6 +20,7 @@
     "kill:ports": "bash ./scripts/kill-ports.sh"
   },
   "dependencies": {
+    "@fastify/helmet": "^13.1.1",
     "@nestjs/common": "^11.1.17",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.17",
