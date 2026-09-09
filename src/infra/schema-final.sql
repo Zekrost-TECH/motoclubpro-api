@@ -496,6 +496,13 @@ CREATE INDEX idx_sos_alerts_club ON sos_alerts(club_id);
 
 -- events
 CREATE INDEX idx_events_club ON events(club_id);
+CREATE INDEX idx_events_club_status_date ON events(club_id, status, date);
+
+-- inventory_items
+CREATE INDEX idx_inventory_items_event ON inventory_items(event_id);
+
+-- checklist_items
+CREATE INDEX idx_checklist_items_event ON checklist_items(event_id);
 
 -- subscriptions
 CREATE INDEX idx_subscriptions_period_end ON club_subscriptions(current_period_end, status);
@@ -503,6 +510,12 @@ CREATE INDEX idx_subscriptions_period_end ON club_subscriptions(current_period_e
 -- payment_transactions
 CREATE INDEX idx_payment_transactions_club ON payment_transactions(club_id, created_at DESC);
 CREATE INDEX idx_payment_transactions_wompi ON payment_transactions(wompi_transaction_id);
+CREATE INDEX idx_payment_transactions_status_wompi
+    ON payment_transactions(status, wompi_transaction_id)
+    WHERE wompi_transaction_id IS NOT NULL;
+
+-- motorcycles
+CREATE INDEX idx_motorcycles_user ON motorcycles(user_id);
 
 -- club_usage
 CREATE INDEX idx_club_usage_year_month ON club_usage(club_id, year_month);
