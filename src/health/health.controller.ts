@@ -1,4 +1,4 @@
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException, Logger } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { DatabaseService } from '../database/database.service';
 import { Inject } from '@nestjs/common';
@@ -7,6 +7,8 @@ import type { Redis } from 'ioredis';
 @Controller('health')
 @ApiTags('health')
 export class HealthController {
+    private readonly logger = new Logger(HealthController.name);
+
     constructor(
         private readonly db: DatabaseService,
         @Inject('REDIS_CLIENT') private readonly redis: Redis,
@@ -14,13 +16,26 @@ export class HealthController {
 
     @Get()
     async check(): Promise<{ status: string; services: { database: string; redis: string } }> {
+        const services: { database: string; redis: string } = { database: 'ok', redis: 'ok' };
+
         try {
             await this.db.query('SELECT 1');
-            await this.redis.ping();
-            return { status: 'ok', services: { database: 'ok', redis: 'ok' } };
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : String(err);
-            throw new ServiceUnavailableException({ status: 'error', message: errorMessage });
+            services.database = 'error';
+            this.logger.error('Health check: database error', err instanceof Error ? err.stack : String(err));
         }
+
+        try {
+            await this.redis.ping();
+        } catch (err) {
+            services.redis = 'error';
+            this.logger.error('Health check: redis error', err instanceof Error ? err.stack : String(err));
+        }
+
+        if (services.database !== 'ok' || services.redis !== 'ok') {
+            throw new ServiceUnavailableException({ status: 'error', services });
+        }
+
+        return { status: 'ok', services };
     }
 }

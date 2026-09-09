@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { HealthController } from './health.controller';
 import { DatabaseService } from '../database/database.service';
 
@@ -32,12 +33,12 @@ describe('HealthController', () => {
 
         it('should throw ServiceUnavailableException when DB fails', async () => {
             dbMock.query.mockRejectedValueOnce(new Error('DB down'));
-            await expect(controller.check()).rejects.toThrow('DB down');
+            await expect(controller.check()).rejects.toThrow(ServiceUnavailableException);
         });
 
         it('should throw ServiceUnavailableException when Redis fails', async () => {
             redisMock.ping.mockRejectedValueOnce(new Error('Redis down'));
-            await expect(controller.check()).rejects.toThrow('Redis down');
+            await expect(controller.check()).rejects.toThrow(ServiceUnavailableException);
         });
     });
 });
