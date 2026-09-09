@@ -211,6 +211,25 @@ export class RoutesService {
             return;
         }
 
+        // Build parallel arrays from valid Point features
+        const names: string[] = [];
+        const geojsons: string[] = [];
+        const types: string[] = [];
+        const sortOrders: number[] = [];
+
+        for (const [index, feature] of g.features.entries()) {
+            const geom = feature.geometry as { type?: string; coordinates?: [number, number] } | undefined;
+            if (!(geom && geom.type === 'Point' && geom.coordinates)) {
+                continue;
+            }
+            names.push((feature.properties?.name as string) || `WP ${index + 1}`);
+            geojsons.push(JSON.stringify({ type: 'Point', coordinates: geom.coordinates }));
+            types.push((feature.properties?.type as string) || 'parada');
+            sortOrders.push(feature.properties?.sortOrder !== undefined ? (feature.properties.sortOrder as number) : index);
+        }
+
+        if (names.length === 0) return;
+
         const client = await this.db.getPool().connect();
         try {
             await client.query('BEGIN');
@@ -219,28 +238,22 @@ export class RoutesService {
             // cada guardado duplicaba los waypoints existentes.
             await client.query('DELETE FROM route_waypoints WHERE route_id = $1', [routeId]);
 
-            for (const [index, feature] of g.features.entries()) {
-                const geom = feature.geometry as { type?: string; coordinates?: [number, number] } | undefined;
-                if (!(geom && geom.type === 'Point' && geom.coordinates)) {
-                    continue;
-                }
-                await client.query(
-                    `INSERT INTO route_waypoints (
-                        id, route_id, name, location, type, estimated_arrival, notes, sort_order
-                    ) VALUES (
-                        gen_random_uuid(), $1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326), $4, $5, $6, $7
-                    )`,
-                    [
-                        routeId,
-                        (feature.properties?.name as string) || `WP ${index + 1}`,
-                        JSON.stringify({ type: 'Point', coordinates: geom.coordinates }),
-                        (feature.properties?.type as string) || 'parada',
-                        null,
-                        (feature.properties?.notes as string) || undefined,
-                        feature.properties?.sortOrder !== undefined ? (feature.properties.sortOrder as number) : index,
-                    ],
-                );
-            }
+            await client.query(
+                `INSERT INTO route_waypoints (
+                    id, route_id, name, location, type, estimated_arrival, notes, sort_order
+                )
+                SELECT
+                    gen_random_uuid(),
+                    $1,
+                    name,
+                    ST_SetSRID(ST_GeomFromGeoJSON(geojson), 4326),
+                    type,
+                    NULL,
+                    NULL,
+                    sort_order
+                FROM unnest($2::text[], $3::text[], $4::text[], $5::integer[]) AS t(name, geojson, type, sort_order)`,
+                [routeId, names, geojsons, types, sortOrders],
+            );
 
             await client.query('COMMIT');
         } catch (e) {
