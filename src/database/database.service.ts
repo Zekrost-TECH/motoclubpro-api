@@ -27,10 +27,32 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         });
     }
 
+    private static readonly MAX_RETRIES = 5;
+    private static readonly RETRY_DELAY_MS = 3000;
+
     async onModuleInit() {
-        const client = await this.pool.connect();
-        this.logger.log('PostgreSQL pool connected');
-        client.release();
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= DatabaseService.MAX_RETRIES; attempt++) {
+            try {
+                const client = await this.pool.connect();
+                this.logger.log('PostgreSQL pool connected');
+                client.release();
+                return;
+            } catch (err) {
+                lastError = err;
+                if (attempt < DatabaseService.MAX_RETRIES) {
+                    this.logger.warn(
+                        `PostgreSQL connection attempt ${attempt}/${DatabaseService.MAX_RETRIES} failed, retrying in ${DatabaseService.RETRY_DELAY_MS}ms...`,
+                    );
+                    await new Promise((resolve) => setTimeout(resolve, DatabaseService.RETRY_DELAY_MS));
+                }
+            }
+        }
+        this.logger.error(
+            `PostgreSQL connection failed after ${DatabaseService.MAX_RETRIES} attempts`,
+            lastError instanceof Error ? lastError.stack : String(lastError),
+        );
+        throw lastError;
     }
 
     async onModuleDestroy() {
