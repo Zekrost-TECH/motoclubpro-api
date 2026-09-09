@@ -60,7 +60,7 @@ export class SosGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
             this.logger.verbose(`Redis pmessage on ${channel}`);
             try {
                 const data = JSON.parse(message) as SosPayload;
-                if (data.type === 'sos') {
+                if (data.type === 'sos' && this.isValidSosPayload(data.payload)) {
                     // Canal: sos:event:{id} | sos:club:{id} | sos:global
                     // El room es el id (último segmento), o 'global'.
                     const parts = channel.split(':');
@@ -71,6 +71,18 @@ export class SosGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
                 this.logger.warn('Invalid SOS payload from Redis', err instanceof Error ? err.stack : String(err));
             }
         });
+    }
+
+    private isValidSosPayload(payload: unknown): payload is SosPayload['payload'] {
+        if (!payload || typeof payload !== 'object') return false;
+        const p = payload as Record<string, unknown>;
+        return (
+            typeof p.alertId === 'string' &&
+            typeof p.userId === 'string' &&
+            typeof p.type === 'string' &&
+            typeof p.lat === 'number' &&
+            typeof p.lng === 'number'
+        );
     }
 
     handleConnection(client: Socket): void {
