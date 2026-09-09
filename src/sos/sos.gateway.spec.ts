@@ -44,7 +44,8 @@ describe('SosGateway', () => {
 
         it('should emit sos_alert to the room on valid pmessage (event channel)', () => {
             gateway.afterInit();
-            const handler = subscriberMock.on.mock.calls[0][1] as (p: string, c: string, m: string) => void;
+            const pmessageCall = subscriberMock.on.mock.calls.find(c => c[0] === 'pmessage');
+            const handler = pmessageCall![1] as (p: string, c: string, m: string) => void;
             const payload = { alertId: 'a1', userId: 'u1', type: 'accidente', lat: 1, lng: 2 };
             handler('sos:*', 'sos:event:event-1', JSON.stringify({ type: 'sos', payload }));
 
@@ -54,7 +55,8 @@ describe('SosGateway', () => {
 
         it('should emit sos_alert to the room on valid pmessage (club channel)', () => {
             gateway.afterInit();
-            const handler = subscriberMock.on.mock.calls[0][1] as (p: string, c: string, m: string) => void;
+            const pmessageCall = subscriberMock.on.mock.calls.find(c => c[0] === 'pmessage');
+            const handler = pmessageCall![1] as (p: string, c: string, m: string) => void;
             const payload = { alertId: 'a2', userId: 'u2', type: 'averia', lat: 3, lng: 4 };
             handler('sos:*', 'sos:club:club-1', JSON.stringify({ type: 'sos', payload }));
 
@@ -64,14 +66,16 @@ describe('SosGateway', () => {
 
         it('should ignore invalid JSON pmessage without throwing', () => {
             gateway.afterInit();
-            const handler = subscriberMock.on.mock.calls[0][1] as (p: string, c: string, m: string) => void;
+            const pmessageCall = subscriberMock.on.mock.calls.find(c => c[0] === 'pmessage');
+            const handler = pmessageCall![1] as (p: string, c: string, m: string) => void;
             expect(() => handler('sos:*', 'sos:event:event-1', 'not-json')).not.toThrow();
             expect(emitMock).not.toHaveBeenCalled();
         });
 
         it('should ignore non-sos messages', () => {
             gateway.afterInit();
-            const handler = subscriberMock.on.mock.calls[0][1] as (p: string, c: string, m: string) => void;
+            const pmessageCall = subscriberMock.on.mock.calls.find(c => c[0] === 'pmessage');
+            const handler = pmessageCall![1] as (p: string, c: string, m: string) => void;
             handler('sos:*', 'sos:event:event-1', JSON.stringify({ type: 'other', payload: {} }));
             expect(emitMock).not.toHaveBeenCalled();
         });

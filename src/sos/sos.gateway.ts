@@ -3,6 +3,7 @@ import { Inject, Logger, OnModuleDestroy } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { Redis } from 'ioredis';
+import { buildCorsOriginValidator } from '../common/cors';
 
 interface SosPayload {
     type: 'sos';
@@ -21,25 +22,11 @@ interface SosPayload {
     namespace: '/sos',
     cors: {
         origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-            const allowed = (process.env.ALLOWED_ORIGINS ?? '')
+            const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
                 .split(',')
                 .map((o) => o.trim())
                 .filter(Boolean);
-            const capacitorOrigins = new Set([
-                'capacitor://localhost',
-                'https://localhost',
-                'http://localhost',
-                'http://10.0.2.2:5173',
-            ]);
-            if (!origin) {
-                callback(null, true);
-                return;
-            }
-            if (capacitorOrigins.has(origin) || allowed.includes(origin)) {
-                callback(null, true);
-                return;
-            }
-            callback(new Error(`CORS bloqueado: ${origin}`), false);
+            buildCorsOriginValidator(allowedOrigins)(origin, callback);
         },
     },
 })
@@ -58,6 +45,11 @@ export class SosGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
     afterInit(): void {
         this.redisSubscriber = this.redisClient.duplicate();
+
+        this.redisSubscriber.on('error', (err: Error) => {
+            this.logger.error('SOS Redis subscriber error', err.stack);
+        });
+
         void this.redisSubscriber.psubscribe('sos:*').then(() => {
             this.logger.log('Subscribed to SOS Redis pattern sos:*');
         }).catch((err) => {
