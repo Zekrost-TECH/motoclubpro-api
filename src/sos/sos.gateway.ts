@@ -18,7 +18,29 @@ interface SosPayload {
 
 @WebSocketGateway({
     namespace: '/sos',
-    cors: { origin: '*' },
+    cors: {
+        origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+            const allowed = (process.env.ALLOWED_ORIGINS ?? '')
+                .split(',')
+                .map((o) => o.trim())
+                .filter(Boolean);
+            const capacitorOrigins = new Set([
+                'capacitor://localhost',
+                'https://localhost',
+                'http://localhost',
+                'http://10.0.2.2:5173',
+            ]);
+            if (!origin) {
+                callback(null, true);
+                return;
+            }
+            if (capacitorOrigins.has(origin) || allowed.includes(origin)) {
+                callback(null, true);
+                return;
+            }
+            callback(new Error(`CORS bloqueado: ${origin}`), false);
+        },
+    },
 })
 export class SosGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
     private readonly logger = new Logger(SosGateway.name);
