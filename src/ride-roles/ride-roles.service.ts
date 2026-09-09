@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
+import { Redis } from 'ioredis';
 import { DatabaseService } from '../database/database.service';
 import type { ClubRideRole } from './ride-roles.types';
 import type { CreateRideRoleDto } from './dto/create-ride-role.dto';
@@ -6,9 +7,25 @@ import type { UpdateRideRoleDto } from './dto/update-ride-role.dto';
 
 @Injectable()
 export class RideRolesService {
-    constructor(private readonly db: DatabaseService) { }
+    private static readonly CACHE_TTL = 120; // 2 minutes
+
+    constructor(
+        private readonly db: DatabaseService,
+        @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    ) { }
+
+    private cacheKey(clubId: string): string {
+        return `ride-roles:${clubId}`;
+    }
+
+    private async invalidate(clubId: string): Promise<void> {
+        await this.redis.del(this.cacheKey(clubId));
+    }
 
     async findByClub(clubId: string): Promise<ClubRideRole[]> {
+        const cached = await this.redis.get(this.cacheKey(clubId));
+        if (cached) return JSON.parse(cached) as ClubRideRole[];
+
         const { rows } = await this.db.query<ClubRideRole>(
             `SELECT id, club_id, slug, name, is_unique, sort_order, created_at, updated_at
              FROM club_ride_roles
@@ -16,6 +33,7 @@ export class RideRolesService {
              ORDER BY sort_order ASC, name ASC`,
             [clubId],
         );
+        await this.redis.set(this.cacheKey(clubId), JSON.stringify(rows), 'EX', RideRolesService.CACHE_TTL);
         return rows;
     }
 
@@ -42,6 +60,7 @@ export class RideRolesService {
              RETURNING id, club_id, slug, name, is_unique, sort_order, created_at, updated_at`,
             [clubId, slug, dto.name.trim(), dto.is_unique ?? false, dto.sort_order ?? 0],
         );
+        await this.invalidate(clubId);
         return rows[0];
     }
 
@@ -64,6 +83,7 @@ export class RideRolesService {
              RETURNING id, club_id, slug, name, is_unique, sort_order, created_at, updated_at`,
             [slug, dto.name?.trim() ?? existing.name, dto.is_unique, dto.sort_order, id, clubId],
         );
+        await this.invalidate(clubId);
         return rows[0];
     }
 
@@ -75,6 +95,7 @@ export class RideRolesService {
         if (rowCount === 0) {
             throw new NotFoundException('Rol de rodada no encontrado');
         }
+        await this.invalidate(clubId);
     }
 
     async seedDefaults(clubId: string): Promise<void> {
