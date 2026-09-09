@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
 import { SosGateway } from './sos.gateway';
 
 describe('SosGateway', () => {
@@ -6,6 +7,7 @@ describe('SosGateway', () => {
     let redisClientMock: any;
     let subscriberMock: any;
     let emitMock: jest.Mock;
+    let jwtServiceMock: any;
 
     beforeEach(async () => {
         emitMock = jest.fn();
@@ -16,11 +18,15 @@ describe('SosGateway', () => {
         redisClientMock = {
             duplicate: jest.fn().mockReturnValue(subscriberMock),
         };
+        jwtServiceMock = {
+            verify: jest.fn().mockReturnValue({ sub: 'u1', email: 'test@test.com', role: 'rider' }),
+        };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 SosGateway,
                 { provide: 'REDIS_CLIENT', useValue: redisClientMock },
+                { provide: JwtService, useValue: jwtServiceMock },
             ],
         }).compile();
 
@@ -72,8 +78,42 @@ describe('SosGateway', () => {
     });
 
     describe('connection lifecycle', () => {
-        it('handleConnection should not throw', () => {
-            expect(() => gateway.handleConnection({ id: 'c1' } as any)).not.toThrow();
+        it('handleConnection should accept client with valid token', () => {
+            const client = {
+                id: 'c1',
+                handshake: { auth: { token: 'valid-token' }, headers: {}, query: {} },
+                disconnect: jest.fn(),
+                data: {},
+            } as any;
+            expect(() => gateway.handleConnection(client)).not.toThrow();
+            expect(jwtServiceMock.verify).toHaveBeenCalledWith('valid-token');
+            expect(client.disconnect).not.toHaveBeenCalled();
+            expect((client.data as any).user).toEqual({ sub: 'u1', email: 'test@test.com', role: 'rider' });
+        });
+
+        it('handleConnection should reject client without token', () => {
+            const client = {
+                id: 'c2',
+                handshake: { auth: {}, headers: {}, query: {} },
+                disconnect: jest.fn(),
+                data: {},
+            } as any;
+            gateway.handleConnection(client);
+            expect(client.disconnect).toHaveBeenCalledWith(true);
+            expect(jwtServiceMock.verify).not.toHaveBeenCalled();
+        });
+
+        it('handleConnection should reject client with invalid token', () => {
+            jwtServiceMock.verify.mockImplementationOnce(() => { throw new Error('invalid'); });
+            const client = {
+                id: 'c3',
+                handshake: { auth: { token: 'bad-token' }, headers: {}, query: {} },
+                disconnect: jest.fn(),
+                data: {},
+            } as any;
+            gateway.handleConnection(client);
+            expect(jwtServiceMock.verify).toHaveBeenCalledWith('bad-token');
+            expect(client.disconnect).toHaveBeenCalledWith(true);
         });
 
         it('handleDisconnect should not throw', () => {

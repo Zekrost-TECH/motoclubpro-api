@@ -1,5 +1,6 @@
 import { WebSocketGateway, WebSocketServer, OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage } from '@nestjs/websockets';
 import { Inject, Logger, OnModuleDestroy } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { Redis } from 'ioredis';
 
@@ -52,6 +53,7 @@ export class SosGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
     constructor(
         @Inject('REDIS_CLIENT') private readonly redisClient: Redis,
+        private readonly jwtService: JwtService,
     ) { }
 
     afterInit(): void {
@@ -80,7 +82,25 @@ export class SosGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     }
 
     handleConnection(client: Socket): void {
-        this.logger.log(`Client connected: ${client.id}`);
+        const token =
+            client.handshake.auth?.token as string | undefined ??
+            client.handshake.headers?.authorization?.replace('Bearer ', '') ??
+            client.handshake.query?.token as string | undefined;
+
+        if (!token) {
+            this.logger.warn(`Connection rejected (no token): ${client.id}`);
+            client.disconnect(true);
+            return;
+        }
+
+        try {
+            const payload = this.jwtService.verify(token) as { sub: string; email: string; role: string };
+            (client.data as Record<string, unknown>).user = payload;
+            this.logger.log(`Client connected: ${client.id} (user: ${payload.sub})`);
+        } catch {
+            this.logger.warn(`Connection rejected (invalid token): ${client.id}`);
+            client.disconnect(true);
+        }
     }
 
     handleDisconnect(client: Socket): void {
