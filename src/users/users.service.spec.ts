@@ -135,13 +135,13 @@ describe('UsersService', () => {
             expect(result.name).toBe('Updated');
         });
 
-        it('should hash password when passwordHash provided', async () => {
+        it('should hash password when password provided', async () => {
             db.query.mockResolvedValueOnce({ rows: [{ id: 'u1', name: 'A' }] });
-            await service.updateUser('u1', { passwordHash: 'newpass' } as never);
+            await service.updateUser('u1', { password: 'newpass12' } as never);
             const sql = db.query.mock.calls[0][0] as string;
             const values = db.query.mock.calls[0][1] as unknown[];
             expect(sql).toContain('password_hash');
-            expect(values[0]).not.toBe('newpass');
+            expect(values).not.toContain('newpass12');
         });
 
         it('should flatten nested emergencyContact into ec columns', async () => {

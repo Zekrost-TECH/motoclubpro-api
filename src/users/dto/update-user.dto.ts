@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsEnum, IsObject, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsEnum, IsObject, ValidateNested, MinLength, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../users.types';
@@ -39,8 +39,12 @@ export class UpdateUserDto {
     @ApiPropertyOptional() @IsOptional() @IsString()
     riderLevel?: string;
 
-    @ApiPropertyOptional() @IsOptional() @IsString()
-    passwordHash?: string;
+    @ApiPropertyOptional({ description: 'New password (min 8 chars, will be hashed)' })
+    @IsOptional()
+    @IsString()
+    @MinLength(8)
+    @MaxLength(128)
+    password?: string;
 
     @ApiPropertyOptional() @IsOptional() @IsString()
     bloodType?: string;

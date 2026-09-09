@@ -223,10 +223,10 @@ export class UsersService {
             delete typedData.emergencyContact;
         }
 
-        if (typedData.passwordHash) {
-            typedData.passwordHash = await bcrypt.hash(typedData.passwordHash as string, 10);
-            typedData.password_hash = typedData.passwordHash;
-            delete typedData.passwordHash;
+        if (typedData.password) {
+            const hashedPassword = await bcrypt.hash(typedData.password as string, 10);
+            typedData.password_hash = hashedPassword;
+            delete typedData.password;
         }
 
         const keys = Object.keys(typedData).filter(x => typedData[x] !== undefined);
