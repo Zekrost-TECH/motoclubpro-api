@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException, ForbiddenException } from '@ne
 import { PoolClient } from 'pg';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
+import { hashPassword } from '../common/utils/bcrypt-cost';
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../notifications/mail.service';
@@ -254,7 +255,7 @@ export class ClubsService {
         targetUserId = existing.id;
       } else {
         const tempPassword = randomBytes(6).toString('hex');
-        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        const hashedPassword = await hashPassword(tempPassword);
         const nameFromEmail = email.split('@')[0];
 
         const { rows } = await this.db.query<{ id: string }>(

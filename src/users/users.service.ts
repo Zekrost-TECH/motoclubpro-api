@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { hashPassword } from '../common/utils/bcrypt-cost';
 import { DatabaseService } from '../database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -38,7 +39,7 @@ export class UsersService {
             }
         }
 
-        const hashedPassword = await bcrypt.hash(data.password, 10);
+        const hashedPassword = await hashPassword(data.password);
 
         const { rows } = await this.db.query<User>(
             `INSERT INTO users (
@@ -224,7 +225,7 @@ export class UsersService {
         }
 
         if (typedData.password) {
-            const hashedPassword = await bcrypt.hash(typedData.password as string, 10);
+            const hashedPassword = await hashPassword(typedData.password as string);
             typedData.password_hash = hashedPassword;
             delete typedData.password;
         }
