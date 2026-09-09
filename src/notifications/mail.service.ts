@@ -103,7 +103,7 @@ Equipo BikerOS
             });
             this.logger.log(`Email sent to ${email}: ${subject}`);
         } else {
-            this.logger.log(`\n--- EMAIL ---\nTo: ${email}\nSubject: ${subject}\n\n${body}\n--- END EMAIL ---\n`);
+            this.logger.log(`[DEV] Email to ${email} | Subject: ${subject} | Body length: ${body.length} chars`);
         }
     }
 }

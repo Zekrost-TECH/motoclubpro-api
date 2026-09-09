@@ -29,21 +29,21 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
 
         switch (pgCode) {
             case '23505': // unique_violation
-                this.logger.warn(`Unique violation: ${pgError.detail}`);
+                this.logger.warn(`Unique violation: constraint=${pgError.constraint ?? 'unknown'}`);
                 return send(409, {
                     statusCode: 409,
                     message: 'Ya existe un registro con esos datos',
                     error: 'Conflicto',
                 });
             case '23503': // foreign_key_violation
-                this.logger.warn(`Foreign key violation: ${pgError.detail}`);
+                this.logger.warn(`Foreign key violation: constraint=${pgError.constraint ?? 'unknown'}`);
                 return send(400, {
                     statusCode: 400,
                     message: 'El recurso relacionado no existe',
                     error: 'Solicitud inválida',
                 });
             case '23502': // not_null_violation
-                this.logger.warn(`Not null violation: ${pgError.detail}`);
+                this.logger.warn(`Not null violation: constraint=${pgError.constraint ?? 'unknown'}`);
                 return send(400, {
                     statusCode: 400,
                     message: 'Faltan datos obligatorios',
