@@ -4,7 +4,6 @@
     "node_modules",
     "dist",
     "test",
-    "**/*.spec.ts",
-    "src/prisma/seed.ts"
+    "**/*.spec.ts"
   ]
 }
