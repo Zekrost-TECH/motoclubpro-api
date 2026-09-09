@@ -14,11 +14,17 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         }
 
         const ssl = this.configService.get<string>('DATABASE_SSL');
+        const maxConnections = parseInt(this.configService.get<string>('DATABASE_POOL_MAX') ?? '', 10);
+        const statementTimeout = parseInt(this.configService.get<string>('DATABASE_STATEMENT_TIMEOUT_MS') ?? '', 10);
+        const queryTimeout = parseInt(this.configService.get<string>('DATABASE_QUERY_TIMEOUT_MS') ?? '', 10);
+
         this.pool = new Pool({
             connectionString,
-            max: 20,
+            max: Number.isNaN(maxConnections) ? 20 : maxConnections,
             connectionTimeoutMillis: 5000,
             idleTimeoutMillis: 30000,
+            statement_timeout: Number.isNaN(statementTimeout) ? undefined : statementTimeout,
+            query_timeout: Number.isNaN(queryTimeout) ? undefined : queryTimeout,
             ...(ssl === 'true' || ssl === 'require' ? { ssl: { rejectUnauthorized: false } } : {}),
         });
 
