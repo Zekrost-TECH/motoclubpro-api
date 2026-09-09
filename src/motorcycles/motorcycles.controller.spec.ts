@@ -53,7 +53,8 @@ describe('MotorcyclesController', () => {
 
     describe('findAll', () => {
         it('should return all motorcycles for club', async () => {
-            const result = await controller.findAll('club-1');
+            const req = { user: { id: 'u1', role: 'rider' } } as any;
+            const result = await controller.findAll(req, 'club-1');
             expect(result).toEqual({ data: [mockMotorcycle], meta: { total: 1, page: 1, limit: 20, totalPages: 1 } });
             expect(service.findAll).toHaveBeenCalledWith(undefined, 'club-1', undefined, undefined);
         });
@@ -61,7 +62,7 @@ describe('MotorcyclesController', () => {
 
     describe('findMine', () => {
         it('should return user motorcycles', async () => {
-            const req = { user: { id: 'user-1' } } as any;
+            const req = { user: { id: 'user-1', role: 'superadmin' } } as any;
             const result = await controller.findMine(req);
             expect(result).toEqual({ data: [mockMotorcycle], meta: { total: 1, page: 1, limit: 20, totalPages: 1 } });
             expect(service.findAll).toHaveBeenCalledWith('user-1', undefined, undefined, undefined);

@@ -48,6 +48,11 @@ describe('AuthService', () => {
                 if (key === 'REFRESH_EXPIRES_IN') return '30d';
                 return null;
             }),
+            getOrThrow: jest.fn((key: string) => {
+                if (key === 'REFRESH_SECRET') return 'refresh-secret';
+                if (key === 'JWT_SECRET') return 'jwt-secret';
+                throw new Error(`Missing env var: ${key}`);
+            }),
         } as unknown as jest.Mocked<ConfigService>;
 
         redis = {

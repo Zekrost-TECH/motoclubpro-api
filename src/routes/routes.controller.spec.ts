@@ -54,7 +54,8 @@ describe('RoutesController', () => {
 
     describe('findAll', () => {
         it('should return routes', async () => {
-            const result = await controller.findAll('club-1');
+            const req = { user: { id: 'u1', role: 'rider' } } as any;
+            const result = await controller.findAll(req, 'club-1');
             expect(result).toEqual({ data: [mockRoute], meta: { total: 1, page: 1, limit: 20, totalPages: 1 } });
             expect(service.findAll).toHaveBeenCalledWith('club-1', undefined, undefined);
         });

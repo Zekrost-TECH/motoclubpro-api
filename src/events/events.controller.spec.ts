@@ -68,7 +68,8 @@ describe('EventsController', () => {
 
     describe('findAll', () => {
         it('should return paginated events', async () => {
-            const result = await controller.findAll('proximo', 'true', 'club-1', { page: 1, limit: 10 });
+            const req = { user: { id: 'u1', role: 'rider' } } as any;
+            const result = await controller.findAll(req, 'proximo', 'true', 'club-1', { page: 1, limit: 10 });
             expect(result.data).toHaveLength(1);
             expect(serviceMock.findAll).toHaveBeenCalledWith('proximo', true, 'club-1', 1, 10);
         });
