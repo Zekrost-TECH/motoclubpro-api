@@ -17,6 +17,8 @@ const LOCK_RETRY_INVOICES = 1004;
 export class BillingCronService {
   private readonly logger = new Logger(BillingCronService.name);
 
+  private static readonly BATCH_SIZE = parseInt(process.env.CRON_BATCH_SIZE ?? '', 10) || 200;
+
   constructor(
     private readonly db: DatabaseService,
     private readonly wompiService: WompiService,
@@ -81,8 +83,10 @@ export class BillingCronService {
                 SELECT 1 FROM payment_transactions pt
                 WHERE pt.subscription_id = s.id AND pt.status = 'pending'
                   AND pt.created_at > NOW() - INTERVAL '7 days'
-           )`,
-        [today],
+           )
+         ORDER BY s.current_period_end ASC
+         LIMIT $2`,
+        [today, BillingCronService.BATCH_SIZE],
       );
 
       for (const sub of subscriptions) {
@@ -131,7 +135,10 @@ export class BillingCronService {
          WHERE pt.status = 'declined'
            AND pt.retry_count < 3
            AND s.retry_count < 3
-           AND pt.created_at > NOW() - INTERVAL '3 days'`,
+           AND pt.created_at > NOW() - INTERVAL '3 days'
+         ORDER BY pt.created_at ASC
+         LIMIT $1`,
+        [BillingCronService.BATCH_SIZE],
       );
 
       for (const tx of failed) {
@@ -196,7 +203,10 @@ export class BillingCronService {
          WHERE status = 'pending'
            AND wompi_transaction_id IS NOT NULL
            AND created_at < NOW() - INTERVAL '15 minutes'
-           AND created_at > NOW() - INTERVAL '7 days'`,
+           AND created_at > NOW() - INTERVAL '7 days'
+         ORDER BY created_at ASC
+         LIMIT $1`,
+        [BillingCronService.BATCH_SIZE],
       );
 
       let reconciled = 0;
@@ -251,7 +261,8 @@ export class BillingCronService {
            AND pt.invoice_generated = FALSE
            AND pt.created_at > NOW() - INTERVAL '60 days'
          ORDER BY pt.created_at
-         LIMIT 50`,
+         LIMIT $1`,
+        [BillingCronService.BATCH_SIZE],
       );
 
       let ok = 0;
