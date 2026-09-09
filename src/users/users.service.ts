@@ -135,7 +135,7 @@ export class UsersService {
         const { rows: userRows } = await this.db.query<User>(`
             SELECT
                 id, name, nickname, email, phone, avatar_url, avatar_initials,
-                role, rider_level AS "riderLevel", password_hash AS "passwordHash", fcm_token,
+                role, rider_level AS "riderLevel", fcm_token,
                 blood_type AS "bloodType", allergies, medical_conditions AS "medicalConditions",
                 ec_name AS "ecName", ec_phone AS "ecPhone", ec_relationship AS "ecRelationship",
                 join_date AS "joinDate", is_active AS "isActive"

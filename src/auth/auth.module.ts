@@ -21,7 +21,7 @@ import { TurnstileModule } from '../turnstile/turnstile.module';
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({
-                secret: configService.get<string>('JWT_SECRET') || 'defaultSecretChangeThis',
+                secret: configService.getOrThrow<string>('JWT_SECRET'),
                 signOptions: {
                     expiresIn: (configService.get<string>('JWT_EXPIRES_IN') || '15m') as unknown as '15m',
                     issuer: 'biker-os-api',

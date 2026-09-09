@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Request, UseGuards, HttpCode, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Request, UseGuards, HttpCode, Query, ForbiddenException } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RoutesService } from './routes.service';
 import { CreateRouteDto } from './dto/create-route.dto';
@@ -27,7 +27,10 @@ export class RoutesController {
     }
 
     @Get()
-    findAll(@CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: Route[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+    findAll(@Request() req: AuthRequest, @CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: Route[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+        if (!clubId && req.user.role !== UserRole.superadmin && req.user.role !== UserRole.admin) {
+            throw new ForbiddenException('Se requiere un club activo (x-club-id) para listar rutas');
+        }
         return this.routesService.findAll(clubId, pagination?.page, pagination?.limit);
     }
 

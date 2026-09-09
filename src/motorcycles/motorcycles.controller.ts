@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Request, UseGuards, HttpCode, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Request, UseGuards, HttpCode, Query, ForbiddenException } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { MotorcyclesService } from './motorcycles.service';
 import { CreateMotorcycleDto } from './dto/create-motorcycle.dto';
@@ -10,6 +10,7 @@ import { ClubGuard } from '../auth/guards/club.guard';
 import { CurrentClub } from '../auth/decorators/club.decorator';
 import type { AuthRequest } from '../auth/auth.types';
 import type { Motorcycle, MaintenanceRecord } from './motorcycles.types';
+import { UserRole } from '../users/users.types';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Controller('motorcycles')
@@ -24,12 +25,18 @@ export class MotorcyclesController {
     }
 
     @Get()
-    findAll(@CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: Motorcycle[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+    findAll(@Request() req: AuthRequest, @CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: Motorcycle[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+        if (!clubId && req.user.role !== UserRole.superadmin && req.user.role !== UserRole.admin) {
+            throw new ForbiddenException('Se requiere un club activo (x-club-id) para listar motocicletas');
+        }
         return this.motorcyclesService.findAll(undefined, clubId, pagination?.page, pagination?.limit);
     }
 
     @Get('mine')
     findMine(@Request() req: AuthRequest, @CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: Motorcycle[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+        if (!clubId && req.user.role !== UserRole.superadmin && req.user.role !== UserRole.admin) {
+            throw new ForbiddenException('Se requiere un club activo (x-club-id) para listar motocicletas');
+        }
         return this.motorcyclesService.findAll(req.user.id, clubId, pagination?.page, pagination?.limit);
     }
 

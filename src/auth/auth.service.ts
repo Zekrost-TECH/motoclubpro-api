@@ -39,7 +39,7 @@ export class AuthService {
     async login(user: Omit<User, 'passwordHash'>): Promise<{ access_token: string; refresh_token: string; user: Omit<User, 'passwordHash'> & { clubs: { club_id: string; role: UserRole }[] } }> {
         const clubs = await this.usersService.getUserClubs(user.id);
         const payload = { sub: user.id, email: user.email, role: user.role, clubs };
-        const refreshSecret = this.configService.get<string>('REFRESH_SECRET');
+        const refreshSecret = this.configService.getOrThrow<string>('REFRESH_SECRET');
         const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '30d';
 
         return {
@@ -69,7 +69,7 @@ export class AuthService {
         if (blacklisted) throw new UnauthorizedException('Token revocado');
 
         try {
-            const secret = this.configService.get<string>('REFRESH_SECRET') ?? 'refreshSecretChangeThis';
+            const secret = this.configService.getOrThrow<string>('REFRESH_SECRET');
             const rawPayload = this.jwtService.verify(refreshToken, { secret }) as unknown;
             const payload = rawPayload as { sub: string };
 
@@ -88,7 +88,7 @@ export class AuthService {
 
             const clubs = await this.usersService.getUserClubs(user.id);
             const newPayload = { sub: user.id, email: user.email, role: user.role, clubs };
-            const refreshSecret = this.configService.get<string>('REFRESH_SECRET') ?? 'refreshSecretChangeThis';
+            const refreshSecret = this.configService.getOrThrow<string>('REFRESH_SECRET');
             const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '30d';
 
             return {
@@ -210,7 +210,7 @@ export class AuthService {
         // lo que hacía que el tracker mostrara rol del club como rol de radar.
         // El rol por club sigue disponible en el claim `clubs`.
         const payload = { sub: user.id, email: user.email, role: user.role, clubs };
-        const refreshSecret = this.configService.get<string>('REFRESH_SECRET');
+        const refreshSecret = this.configService.getOrThrow<string>('REFRESH_SECRET');
         const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '30d';
 
         return {

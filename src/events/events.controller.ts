@@ -10,6 +10,7 @@ import {
     UseGuards,
     Request,
     Query,
+    ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { EventsService, type EventRow, type AttendeeRow, type InventoryRow, type ChecklistItemRow, type GuestRow } from './events.service';
@@ -38,11 +39,15 @@ export class EventsController {
 
     @Get()
     findAll(
+        @Request() req: AuthRequest,
         @Query('status') status?: string,
         @Query('upcoming') upcoming?: string,
         @CurrentClub() clubId?: string,
         @Query() query?: FindEventsQueryDto,
     ): Promise<{ data: EventRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+        if (!clubId && req.user.role !== UserRole.superadmin && req.user.role !== UserRole.admin) {
+            throw new ForbiddenException('Se requiere un club activo (x-club-id) para listar rodadas');
+        }
         const isUpcoming = upcoming === 'true';
         return this.eventsService.findAll(status, isUpcoming, clubId, query?.page, query?.limit);
     }
