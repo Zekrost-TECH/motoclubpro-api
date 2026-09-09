@@ -1,10 +1,11 @@
-import { Controller, Post, Body, Headers, BadRequestException, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Headers, BadRequestException, Logger, ValidationPipe } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { createHash, timingSafeEqual } from 'crypto';
 import { ApiTags } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
 import { DatabaseService } from '../database/database.service';
+import { WompiWebhookEventDto } from './dto/wompi-webhook-event.dto';
 import type { WompiWebhookEvent } from './billing.types';
 
 @Controller('webhooks/wompi')
@@ -21,7 +22,12 @@ export class WompiWebhookController {
 
   @Post()
   async handleWebhook(
-    @Body() event: WompiWebhookEvent,
+    @Body(new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: false,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    })) event: WompiWebhookEventDto,
     @Headers('x-event-checksum') headerChecksum?: string,
   ): Promise<{ received: boolean }> {
     const secret = this.config.get<string>('WOMPI_EVENTS_SECRET');
