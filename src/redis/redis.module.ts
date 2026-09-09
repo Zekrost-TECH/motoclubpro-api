@@ -11,12 +11,13 @@ import { Redis } from 'ioredis';
             useFactory: (configService: ConfigService) => {
                 const redisUrl = configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
                 const isTLS = redisUrl.startsWith('rediss://');
+                const rejectUnauthorized = configService.get<string>('REDIS_TLS_REJECT_UNAUTHORIZED') !== 'false';
 
                 const client = new Redis(redisUrl, {
                     maxRetriesPerRequest: 3,
                     ...(isTLS && {
                         tls: {
-                            rejectUnauthorized: false,
+                            rejectUnauthorized,
                         },
                     }),
                 });
