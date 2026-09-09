@@ -8,6 +8,7 @@ export class LoggingInterceptor implements NestInterceptor {
 
     intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
         const req = context.switchToHttp().getRequest<{ method?: string; url?: string; user?: { id?: string } }>();
+        const res = context.switchToHttp().getResponse<{ statusCode?: number }>();
         const method = req.method ?? 'UNKNOWN';
         const url = req.url ?? 'UNKNOWN';
         const userId = req.user?.id ?? 'anonymous';
@@ -16,7 +17,14 @@ export class LoggingInterceptor implements NestInterceptor {
         return next.handle().pipe(
             tap(() => {
                 const duration = Date.now() - now;
-                this.logger.log(`${method} ${url} — ${userId} — ${duration}ms`);
+                const statusCode = res.statusCode ?? 200;
+                this.logger.log(JSON.stringify({
+                    method,
+                    url,
+                    statusCode,
+                    userId,
+                    durationMs: duration,
+                }));
             }),
         );
     }

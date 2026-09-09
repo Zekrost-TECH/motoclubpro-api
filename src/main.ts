@@ -104,10 +104,15 @@ function validateEnv(config: ConfigService): void {
 }
 
 async function bootstrap() {
+  const logLevels = (process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'log' : 'debug'))
+    .split(',')
+    .map(l => l.trim())
+    .filter(Boolean) as ('log' | 'error' | 'warn' | 'debug' | 'verbose' | 'fatal')[];
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
-      logger: process.env.NODE_ENV !== 'production',
+      logger: logLevels,
       trustProxy: true,
     }),
   );
