@@ -4,7 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserRole } from './users.types';
-import { toSnakeCase } from '../common/utils/string.utils';
+
 import type { AuthUser } from '../auth/auth.types';
 
 const ASSIGNABLE_ROLES: Record<string, UserRole[]> = {
@@ -232,8 +232,32 @@ export class UsersService {
         const keys = Object.keys(typedData).filter(x => typedData[x] !== undefined);
         if (keys.length === 0) return this.findOne(id);
 
-        const setString = keys.map((key, i) => `"${toSnakeCase(key)}" = $${i + 1}`).join(', ');
-        const values = keys.map(k => typedData[k]);
+        // Explicit allowlist: only these DTO fields map to DB columns.
+        // Prevents SQL injection even if the ValidationPipe is bypassed.
+        const COLUMN_MAP: Record<string, string> = {
+            name: 'name',
+            email: 'email',
+            nickname: 'nickname',
+            phone: 'phone',
+            avatarUrl: 'avatar_url',
+            avatarInitials: 'avatar_initials',
+            role: 'role',
+            riderLevel: 'rider_level',
+            password_hash: 'password_hash',
+            bloodType: 'blood_type',
+            allergies: 'allergies',
+            medicalConditions: 'medical_conditions',
+            ecName: 'ec_name',
+            ecPhone: 'ec_phone',
+            ecRelationship: 'ec_relationship',
+            fcmToken: 'fcm_token',
+        };
+
+        const allowedKeys = keys.filter(k => k in COLUMN_MAP);
+        if (allowedKeys.length === 0) return this.findOne(id);
+
+        const setString = allowedKeys.map((key, i) => `"${COLUMN_MAP[key]}" = $${i + 1}`).join(', ');
+        const values = allowedKeys.map(k => typedData[k]);
         values.push(id);
 
         const query = `
