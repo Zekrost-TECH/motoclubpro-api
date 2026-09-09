@@ -80,8 +80,8 @@ export class ClubsController {
   @Get()
   @UseGuards(RolesGuard)
   @Roles(UserRole.superadmin)
-  async findAll(): Promise<ClubRow[]> {
-    return this.clubsService.findAll();
+  async findAll(@Query() pagination?: PaginationDto): Promise<{ data: ClubRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+    return this.clubsService.findAll(pagination?.page, pagination?.limit);
   }
 
   @Post(':id/join')
