@@ -33,7 +33,12 @@ describe('BillingCronService', () => {
     beforeEach(async () => {
         dbQueryMock = jest.fn().mockResolvedValue({ rows: [] });
         poolClientMock = {
-            query: jest.fn().mockResolvedValue({ rows: [] }),
+            query: jest.fn().mockImplementation((queryText: string) => {
+                if (queryText.includes('pg_try_advisory_lock')) {
+                    return Promise.resolve({ rows: [{ lock: true }] });
+                }
+                return Promise.resolve({ rows: [] });
+            }),
             release: jest.fn(),
         };
         wompiMock = { createTransaction: jest.fn().mockResolvedValue({ data: { id: 'tx-1' } } as any) };
