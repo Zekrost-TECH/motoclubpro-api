@@ -2,7 +2,7 @@ import { Controller, Post, Body, Headers, BadRequestException, Logger, Validatio
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { createHash, timingSafeEqual } from 'crypto';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
 import { DatabaseService } from '../database/database.service';
 import { WompiWebhookEventDto } from './dto/wompi-webhook-event.dto';
@@ -21,6 +21,7 @@ export class WompiWebhookController {
   ) { }
 
   @Post()
+  @ApiOperation({ summary: 'Recibir webhook', description: 'Recibe y procesa eventos de webhook de Wompi verificando el checksum' })
   async handleWebhook(
     @Body(new ValidationPipe({
       whitelist: true,

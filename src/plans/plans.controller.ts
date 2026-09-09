@@ -1,5 +1,5 @@
 import { Controller, Get, UseGuards, Inject } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Redis } from 'ioredis';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
@@ -21,6 +21,8 @@ export class PlansController {
     ) { }
 
     @Get()
+    @ApiOperation({ summary: 'Listar planes', description: 'Obtiene la lista de planes activos con caché en Redis' })
+    @ApiBearerAuth()
     async list() {
         const cached = await this.redis.get(PlansController.CACHE_KEY);
         if (cached) return JSON.parse(cached);
@@ -37,6 +39,8 @@ export class PlansController {
     }
 
     @Get('limits')
+    @ApiOperation({ summary: 'Obtener límites', description: 'Obtiene los límites del plan del club activo' })
+    @ApiBearerAuth()
     async getLimits(@CurrentClub() clubId: string) {
         return this.plansService.getClubLimits(clubId);
     }

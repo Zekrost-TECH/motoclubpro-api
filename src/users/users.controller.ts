@@ -11,7 +11,7 @@ import {
     Query,
     ForbiddenException,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -35,12 +35,16 @@ export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Post()
+    @ApiOperation({ summary: 'Crear usuario', description: 'Crea un nuevo usuario (solo gestores de usuarios)' })
+    @ApiBearerAuth()
     @UseGuards(UserManagerGuard)
     create(@Body() createUserDto: CreateUserDto, @Request() req: AuthRequest): Promise<User> {
         return this.usersService.createUser(createUserDto, req.user);
     }
 
     @Get()
+    @ApiOperation({ summary: 'Listar usuarios', description: 'Obtiene la lista de usuarios del club con paginación' })
+    @ApiBearerAuth()
     @Roles(UserRole.admin, UserRole.leader, UserRole.rider)
     findAll(@Request() req: AuthRequest, @CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: User[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
         if (!clubId && req.user.role !== UserRole.superadmin && req.user.role !== UserRole.admin) {
@@ -50,22 +54,30 @@ export class UsersController {
     }
 
     @Get('me')
+    @ApiOperation({ summary: 'Obtener mi perfil', description: 'Obtiene el perfil del usuario autenticado' })
+    @ApiBearerAuth()
     getMe(@Request() req: AuthRequest): Promise<User & { motorcycle?: unknown; userPositions?: unknown }> {
         return this.usersService.findOne(req.user.id);
     }
 
     @Patch('me')
+    @ApiOperation({ summary: 'Actualizar mi perfil', description: 'Actualiza el perfil del usuario autenticado' })
+    @ApiBearerAuth()
     updateMe(@Request() req: AuthRequest, @Body() updateUserDto: UpdateUserDto): Promise<User> {
         return this.usersService.updateUser(req.user.id, updateUserDto);
     }
 
     @Get(':id')
+    @ApiOperation({ summary: 'Obtener usuario', description: 'Obtiene un usuario por su ID' })
+    @ApiBearerAuth()
     @UseGuards(SelfOrAdminGuard)
     findOne(@Param('id') id: string): Promise<User & { motorcycle?: unknown; userPositions?: unknown }> {
         return this.usersService.findOne(id);
     }
 
     @Patch(':id')
+    @ApiOperation({ summary: 'Actualizar usuario', description: 'Actualiza los datos de un usuario por su ID' })
+    @ApiBearerAuth()
     @UseGuards(SelfOrAdminGuard)
     update(
         @Param('id') id: string,
@@ -76,12 +88,16 @@ export class UsersController {
     }
 
     @Get(':id/medical')
+    @ApiOperation({ summary: 'Obtener info médica', description: 'Obtiene la información médica de un usuario por su ID' })
+    @ApiBearerAuth()
     @UseGuards(SelfOrAdminGuard)
     getMedicalInfo(@Param('id') id: string): Promise<User> {
         return this.usersService.getMedicalInfo(id);
     }
 
     @Delete(':id')
+    @ApiOperation({ summary: 'Eliminar usuario', description: 'Elimina un usuario por su ID (solo admin)' })
+    @ApiBearerAuth()
     @Roles(UserRole.admin)
     remove(@Param('id') id: string, @Request() req: AuthRequest): Promise<User> {
         return this.usersService.remove(id, req.user);

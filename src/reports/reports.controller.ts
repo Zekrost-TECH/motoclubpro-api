@@ -1,5 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
 import { ClubRolesGuard } from '../auth/guards/club-roles.guard';
@@ -13,6 +13,8 @@ export class ReportsController {
     constructor(private readonly reportsService: ReportsService) { }
 
     @Get('events')
+    @ApiOperation({ summary: 'Reporte de rodadas', description: 'Genera un reporte de rodadas del club en un rango de fechas' })
+    @ApiBearerAuth()
     async events(
         @Query('from') from: string,
         @Query('to') to: string,
@@ -27,6 +29,8 @@ export class ReportsController {
     }
 
     @Get('sos')
+    @ApiOperation({ summary: 'Reporte de SOS', description: 'Genera un reporte de alertas SOS del club en un rango de fechas' })
+    @ApiBearerAuth()
     async sos(
         @Query('from') from: string,
         @Query('to') to: string,
@@ -41,6 +45,8 @@ export class ReportsController {
     }
 
     @Get('members')
+    @ApiOperation({ summary: 'Reporte de miembros', description: 'Genera un reporte de miembros del club' })
+    @ApiBearerAuth()
     async members(@CurrentClub() clubId: string) {
         const r = await this.reportsService.membersReport(clubId);
         return {
@@ -51,6 +57,8 @@ export class ReportsController {
     }
 
     @Get('financial')
+    @ApiOperation({ summary: 'Reporte financiero', description: 'Genera un reporte financiero del club en un rango de fechas' })
+    @ApiBearerAuth()
     async financial(
         @Query('from') from: string,
         @Query('to') to: string,
@@ -66,6 +74,8 @@ export class ReportsController {
     }
 
     @Get('support-points')
+    @ApiOperation({ summary: 'Reporte puntos de apoyo', description: 'Genera un reporte de puntos de apoyo del club' })
+    @ApiBearerAuth()
     async supportPoints(@CurrentClub() clubId: string) {
         const r = await this.reportsService.supportPointsReport(clubId);
         return {

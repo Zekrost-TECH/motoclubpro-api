@@ -13,7 +13,7 @@ import {
     ForbiddenException,
     ParseArrayPipe,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { EventsService, type EventRow, type AttendeeRow, type InventoryRow, type ChecklistItemRow, type GuestRow } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -41,6 +41,8 @@ export class EventsController {
     constructor(private readonly eventsService: EventsService) { }
 
     @Get()
+    @ApiOperation({ summary: 'Listar rodadas', description: 'Obtiene la lista de rodadas del club con filtros y paginación' })
+    @ApiBearerAuth()
     findAll(
         @Request() req: AuthRequest,
         @Query('status') status?: string,
@@ -56,6 +58,8 @@ export class EventsController {
     }
 
     @Get('active')
+    @ApiOperation({ summary: 'Rodadas activas', description: 'Obtiene las rodadas en curso de todos los clubes del usuario' })
+    @ApiBearerAuth()
     findActive(@Request() req: AuthRequest): Promise<Array<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }>> {
         // Rodadas en curso de TODOS los clubes del usuario (ROD-15): no depende
         // del club activo, resuelve membresías desde la BD.
@@ -63,29 +67,39 @@ export class EventsController {
     }
 
     @Get(':id')
+    @ApiOperation({ summary: 'Obtener rodada', description: 'Obtiene una rodada por su ID con asistentes, inventario y acompañantes' })
+    @ApiBearerAuth()
     findOne(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<EventRow & { attendees: AttendeeRow[]; inventory: InventoryRow[]; guests: GuestRow[] }> {
         return this.eventsService.findOne(id, clubId);
     }
 
     @Post()
+    @ApiOperation({ summary: 'Crear rodada', description: 'Crea una nueva rodada en el club activo' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     create(@Body() createEventDto: CreateEventDto, @Request() req: AuthRequest, @CurrentClub() clubId?: string): Promise<EventRow> {
         return this.eventsService.create(createEventDto, req.user.id, clubId, req.user.role);
     }
 
     @Patch(':id')
+    @ApiOperation({ summary: 'Actualizar rodada', description: 'Actualiza los datos de una rodada existente' })
+    @ApiBearerAuth()
     @UseGuards(EventCaptainGuard)
     update(@Param('id') id: string, @Body() updateEventDto: UpdateEventDto, @CurrentClub() clubId?: string): Promise<EventRow> {
         return this.eventsService.update(id, updateEventDto, clubId);
     }
 
     @Patch(':id/status')
+    @ApiOperation({ summary: 'Cambiar estado', description: 'Actualiza el estado de una rodada' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     updateStatus(@Param('id') id: string, @Body() updateEventStatusDto: UpdateEventStatusDto, @CurrentClub() clubId?: string): Promise<EventRow> {
         return this.eventsService.updateStatus(id, updateEventStatusDto.status, clubId);
     }
 
     @Delete(':id')
+    @ApiOperation({ summary: 'Eliminar rodada', description: 'Elimina una rodada por su ID' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin)
     remove(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<{ deleted: boolean }> {
         return this.eventsService.remove(id, clubId);
@@ -93,21 +107,29 @@ export class EventsController {
 
     // --- RSVP ---
     @Post(':id/rsvp')
+    @ApiOperation({ summary: 'Confirmar asistencia', description: 'Confirma la asistencia del usuario a una rodada con un rol' })
+    @ApiBearerAuth()
     rsvp(@Param('id') id: string, @Request() req: AuthRequest, @Body() dto: RsvpDto, @CurrentClub() clubId?: string): Promise<{ success: boolean; message: string }> {
         return this.eventsService.rsvp(id, req.user, dto.rideRole, clubId);
     }
 
     @Delete(':id/rsvp')
+    @ApiOperation({ summary: 'Cancelar asistencia', description: 'Cancela la asistencia del usuario a una rodada' })
+    @ApiBearerAuth()
     cancelRsvp(@Param('id') id: string, @Request() req: AuthRequest, @CurrentClub() clubId?: string): Promise<{ deleted: boolean }> {
         return this.eventsService.cancelRsvp(id, req.user.id, clubId);
     }
 
     @Get(':id/attendees')
+    @ApiOperation({ summary: 'Listar asistentes', description: 'Obtiene la lista de asistentes de una rodada' })
+    @ApiBearerAuth()
     getAttendees(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<AttendeeRow[]> {
         return this.eventsService.getAttendees(id, clubId);
     }
 
     @Patch(':id/attendees/:userId')
+    @ApiOperation({ summary: 'Actualizar rol asistente', description: 'Actualiza el rol de un asistente dentro de una rodada' })
+    @ApiBearerAuth()
     @UseGuards(EventCaptainGuard)
     updateAttendeeRole(
         @Param('id') id: string,
@@ -125,11 +147,15 @@ export class EventsController {
 
     // --- CHECKLIST ---
     @Get(':id/checklist')
+    @ApiOperation({ summary: 'Obtener checklist', description: 'Obtiene la lista de items del checklist de una rodada' })
+    @ApiBearerAuth()
     getChecklist(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<ChecklistItemRow[]> {
         return this.eventsService.getChecklist(id, clubId);
     }
 
     @Post(':id/checklist')
+    @ApiOperation({ summary: 'Agregar item checklist', description: 'Añade un nuevo item al checklist de una rodada' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     addChecklistItem(
         @Param('id') id: string,
@@ -140,6 +166,8 @@ export class EventsController {
     }
 
     @Delete(':id/checklist/:itemId')
+    @ApiOperation({ summary: 'Eliminar item checklist', description: 'Elimina un item del checklist de una rodada' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     removeChecklistItem(
         @Param('id') id: string,
@@ -150,6 +178,8 @@ export class EventsController {
     }
 
     @Post(':id/checklist/respond')
+    @ApiOperation({ summary: 'Responder checklist', description: 'Registra las respuestas del usuario al checklist de una rodada' })
+    @ApiBearerAuth()
     respondChecklist(
         @Param('id') id: string,
         @Request() req: AuthRequest,
@@ -160,6 +190,8 @@ export class EventsController {
     }
 
     @Get(':id/checklist/status')
+    @ApiOperation({ summary: 'Estado del checklist', description: 'Obtiene el estado de completitud del checklist por usuario' })
+    @ApiBearerAuth()
     @UseGuards(EventCaptainGuard)
     getChecklistStatus(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<{ userId: string; name: string; checklist_completed: boolean }[]> {
         return this.eventsService.getChecklistStatus(id, clubId);
@@ -167,27 +199,37 @@ export class EventsController {
 
     // --- INVENTORY ---
     @Get(':id/inventory')
+    @ApiOperation({ summary: 'Obtener inventario', description: 'Obtiene la lista de items del inventario de una rodada' })
+    @ApiBearerAuth()
     getInventory(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<InventoryRow[]> {
         return this.eventsService.getInventory(id, clubId);
     }
 
     @Post(':id/inventory')
+    @ApiOperation({ summary: 'Agregar item inventario', description: 'Añade un nuevo item al inventario de una rodada' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     addInventoryItem(@Param('id') id: string, @Body() createInventoryItemDto: CreateInventoryItemDto, @CurrentClub() clubId?: string): Promise<InventoryRow> {
         return this.eventsService.addInventoryItem(id, createInventoryItemDto, clubId);
     }
 
     @Patch(':id/inventory/:itemId/claim')
+    @ApiOperation({ summary: 'Reclamar item inventario', description: 'Reclama un item del inventario de una rodada' })
+    @ApiBearerAuth()
     claimInventoryItem(@Param('id') id: string, @Param('itemId') itemId: string, @Request() req: AuthRequest, @CurrentClub() clubId?: string): Promise<InventoryRow> {
         return this.eventsService.claimInventoryItem(id, itemId, req.user.id, clubId);
     }
 
     @Delete(':id/inventory/:itemId/claim')
+    @ApiOperation({ summary: 'Liberar item inventario', description: 'Libera un item del inventario previamente reclamado' })
+    @ApiBearerAuth()
     releaseInventoryItem(@Param('id') id: string, @Param('itemId') itemId: string, @Request() req: AuthRequest, @CurrentClub() clubId?: string): Promise<{ released: boolean; item: InventoryRow }> {
         return this.eventsService.releaseInventoryItem(id, itemId, req.user.id, clubId);
     }
 
     @Delete(':id/inventory/:itemId')
+    @ApiOperation({ summary: 'Eliminar item inventario', description: 'Elimina un item del inventario de una rodada' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     removeInventoryItem(@Param('id') id: string, @Param('itemId') itemId: string, @CurrentClub() clubId?: string): Promise<{ deleted: boolean }> {
         return this.eventsService.removeInventoryItem(id, itemId, clubId);
@@ -195,11 +237,15 @@ export class EventsController {
 
     // --- GUESTS (acompañantes e invitados sin cuenta) ---
     @Get(':id/guests')
+    @ApiOperation({ summary: 'Obtener acompañantes', description: 'Obtiene la lista de acompañantes e invitados de una rodada' })
+    @ApiBearerAuth()
     getGuests(@Param('id') id: string, @CurrentClub() clubId?: string): Promise<GuestRow[]> {
         return this.eventsService.getGuests(id, clubId);
     }
 
     @Post(':id/guests')
+    @ApiOperation({ summary: 'Agregar acompañante', description: 'Añade un acompañante o invitado sin cuenta a una rodada' })
+    @ApiBearerAuth()
     addGuest(
         @Param('id') id: string,
         @Request() req: AuthRequest,
@@ -210,6 +256,8 @@ export class EventsController {
     }
 
     @Patch(':id/guests/:guestId')
+    @ApiOperation({ summary: 'Actualizar acompañante', description: 'Actualiza los datos de un acompañante de una rodada' })
+    @ApiBearerAuth()
     updateGuest(
         @Param('id') id: string,
         @Param('guestId') guestId: string,
@@ -221,6 +269,8 @@ export class EventsController {
     }
 
     @Delete(':id/guests/:guestId')
+    @ApiOperation({ summary: 'Eliminar acompañante', description: 'Elimina un acompañante de una rodada' })
+    @ApiBearerAuth()
     removeGuest(
         @Param('id') id: string,
         @Param('guestId') guestId: string,

@@ -26,7 +26,9 @@ interface SosPayload {
                 .split(',')
                 .map((o) => o.trim())
                 .filter(Boolean);
-            buildCorsOriginValidator(allowedOrigins)(origin, callback);
+            buildCorsOriginValidator(allowedOrigins)(origin, (err, allow) => {
+                callback(err, typeof allow === 'boolean' ? allow : Boolean(allow));
+            });
         },
     },
 })

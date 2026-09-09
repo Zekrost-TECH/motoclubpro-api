@@ -8,7 +8,7 @@ import {
     Param,
     UseGuards,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
 import { ClubRoles } from '../auth/decorators/club-role.decorator';
@@ -27,12 +27,16 @@ export class RideRolesController {
     constructor(private readonly rideRolesService: RideRolesService) { }
 
     @Get()
+    @ApiOperation({ summary: 'Listar roles', description: 'Obtiene la lista de roles de rodada del club' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     findAll(@CurrentClub('id') clubId: string): Promise<ClubRideRole[]> {
         return this.rideRolesService.findByClub(clubId);
     }
 
     @Post()
+    @ApiOperation({ summary: 'Crear rol', description: 'Crea un nuevo rol de rodada para el club' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     create(
         @CurrentClub('id') clubId: string,
@@ -42,6 +46,8 @@ export class RideRolesController {
     }
 
     @Patch(':id')
+    @ApiOperation({ summary: 'Actualizar rol', description: 'Actualiza un rol de rodada existente' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     update(
         @CurrentClub('id') clubId: string,
@@ -52,6 +58,8 @@ export class RideRolesController {
     }
 
     @Delete(':id')
+    @ApiOperation({ summary: 'Eliminar rol', description: 'Elimina un rol de rodada del club' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     remove(
         @CurrentClub('id') clubId: string,

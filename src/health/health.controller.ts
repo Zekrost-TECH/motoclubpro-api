@@ -1,5 +1,5 @@
 import { Controller, Get, ServiceUnavailableException, Logger } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { DatabaseService } from '../database/database.service';
 import { Inject } from '@nestjs/common';
 import type { Redis } from 'ioredis';
@@ -15,6 +15,7 @@ export class HealthController {
     ) { }
 
     @Get()
+    @ApiOperation({ summary: 'Health check', description: 'Verifica el estado de la base de datos y Redis' })
     async check(): Promise<{ status: string; services: { database: string; redis: string } }> {
         const services: { database: string; redis: string } = { database: 'ok', redis: 'ok' };
 

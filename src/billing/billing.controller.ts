@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, Logger, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
@@ -29,6 +29,8 @@ export class BillingController {
     ) { }
 
     @Get('acceptance-token')
+    @ApiOperation({ summary: 'Token de aceptación', description: 'Obtiene el token de aceptación y configuración pública de Wompi' })
+    @ApiBearerAuth()
     async acceptanceToken() {
         const merchant = await this.wompiService.getMerchantInfo();
         return {
@@ -41,6 +43,8 @@ export class BillingController {
     }
 
     @Post('payment-sources')
+    @ApiOperation({ summary: 'Crear fuente de pago', description: 'Registra una nueva fuente de pago en Wompi para el club' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     async createPaymentSource(@CurrentClub() clubId: string | null, @Body() dto: CreatePaymentSourceDto) {
         if (!clubId) {
@@ -50,6 +54,8 @@ export class BillingController {
     }
 
     @Delete('payment-source')
+    @ApiOperation({ summary: 'Eliminar fuente de pago', description: 'Elimina la fuente de pago asociada al club' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     async deletePaymentSource(@CurrentClub() clubId: string | null) {
         if (!clubId) {
@@ -60,6 +66,8 @@ export class BillingController {
     }
 
     @Post('checkout')
+    @ApiOperation({ summary: 'Crear checkout', description: 'Crea una sesión de checkout de Wompi para suscribirse a un plan' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     async checkout(@CurrentClub() clubId: string | null, @Body() dto: SubscribeDto) {
         if (!clubId) {
@@ -70,6 +78,8 @@ export class BillingController {
     }
 
     @Post('subscription')
+    @ApiOperation({ summary: 'Crear suscripción', description: 'Crea una suscripción del club a un plan con ciclo de facturación' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     async subscribe(@CurrentClub() clubId: string | null, @Body() dto: SubscribeDto) {
         if (!clubId) {
@@ -79,6 +89,8 @@ export class BillingController {
     }
 
     @Patch('subscription')
+    @ApiOperation({ summary: 'Cambiar suscripción', description: 'Cambia el plan o ciclo de facturación de la suscripción actual' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     async changeSubscription(@CurrentClub() clubId: string | null, @Body() dto: ChangeSubscriptionDto) {
         if (!clubId) {
@@ -88,6 +100,8 @@ export class BillingController {
     }
 
     @Post('subscription/cancel')
+    @ApiOperation({ summary: 'Cancelar suscripción', description: 'Cancela la suscripción activa del club a fin de período' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     async cancelSubscription(@CurrentClub() clubId: string | null, @Body() dto: CancelSubscriptionDto) {
         if (!clubId) {
@@ -98,6 +112,8 @@ export class BillingController {
     }
 
     @Get('subscription')
+    @ApiOperation({ summary: 'Obtener suscripción', description: 'Obtiene el estado y detalles de la suscripción del club' })
+    @ApiBearerAuth()
     async subscription(@CurrentClub() clubId?: string) {
         interface SubscriptionDb {
             plan_id: string;
@@ -175,6 +191,8 @@ export class BillingController {
     }
 
     @Get('payments')
+    @ApiOperation({ summary: 'Listar pagos', description: 'Obtiene el historial de transacciones de pago del club' })
+    @ApiBearerAuth()
     async payments(@CurrentClub() clubId?: string) {
         const { rows } = await this.db.query(
             `SELECT id, paid_at AS date, (amount_cents / 100.0)::float8 AS amount,

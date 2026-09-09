@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, UseGuards, Req, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SosService } from './sos.service';
 import { type SosAlertRow, type SosAlertSummary } from './sos.types';
 import { CreateSosDto } from './dto/create-sos.dto';
@@ -22,22 +22,30 @@ export class SosController {
     // Limitar crear alertas SOS: max 2 requests en 1 minuto (60000ms)
     @Throttle({ default: { limit: 2, ttl: 60000 } })
     @Post()
+    @ApiOperation({ summary: 'Crear alerta SOS', description: 'Crea una nueva alerta SOS para el usuario autenticado' })
+    @ApiBearerAuth()
     async create(@Req() req: AuthRequest, @Body() createSosDto: CreateSosDto, @CurrentClub() clubId?: string): Promise<SosAlertSummary> {
         const userId = req.user.id;
         return await this.sosService.create(userId, createSosDto, clubId);
     }
 
     @Get()
+    @ApiOperation({ summary: 'Listar alertas SOS', description: 'Obtiene la lista de alertas SOS del club con paginación' })
+    @ApiBearerAuth()
     async findAll(@CurrentClub() clubId?: string, @Query('status') status?: string, @Query() pagination?: PaginationDto): Promise<{ data: SosAlertRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
         return await this.sosService.findAll(clubId, pagination?.page, pagination?.limit, status);
     }
 
     @Get('active')
+    @ApiOperation({ summary: 'Alertas activas', description: 'Obtiene las alertas SOS activas del club' })
+    @ApiBearerAuth()
     async findActive(@CurrentClub() clubId?: string, @Query() pagination?: PaginationDto): Promise<{ data: SosAlertRow[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
         return await this.sosService.findActive(clubId, pagination?.page, pagination?.limit);
     }
 
     @Patch(':id/resolve')
+    @ApiOperation({ summary: 'Resolver alerta', description: 'Marca una alerta SOS como resuelta' })
+    @ApiBearerAuth()
     @ClubRoles(UserRole.admin, UserRole.leader)
     async resolve(@Param('id') id: string, @Req() req: AuthRequest, @CurrentClub() clubId?: string): Promise<SosAlertSummary> {
         const userId = req.user.id;

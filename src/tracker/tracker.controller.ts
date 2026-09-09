@@ -5,7 +5,7 @@ import {
     UseGuards,
     Request,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubGuard } from '../auth/guards/club.guard';
 import { TrackerService } from './tracker.service';
@@ -20,6 +20,8 @@ export class TrackerController {
     constructor(private readonly trackerService: TrackerService) { }
 
     @Post('position')
+    @ApiOperation({ summary: 'Guardar posición', description: 'Guarda la posición GPS del usuario autenticado' })
+    @ApiBearerAuth()
     async savePosition(
         @Request() req: AuthRequest,
         @Body() dto: CreatePositionDto,
