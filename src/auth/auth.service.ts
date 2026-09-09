@@ -11,8 +11,8 @@ import { Redis } from 'ioredis';
 import { User, UserRole } from '../users/users.types';
 import { RegisterDto } from './dto/register.dto';
 
-// TTL de la blacklist = duración máxima del refresh token (30 días en segundos)
-const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 30;
+// TTL de la blacklist = duración máxima del refresh token (7 días en segundos)
+const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 @Injectable()
 export class AuthService {
@@ -40,7 +40,7 @@ export class AuthService {
         const clubs = await this.usersService.getUserClubs(user.id);
         const payload = { sub: user.id, email: user.email, role: user.role, clubs };
         const refreshSecret = this.configService.getOrThrow<string>('REFRESH_SECRET');
-        const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '30d';
+        const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '7d';
 
         return {
             access_token: this.jwtService.sign(payload),
@@ -89,7 +89,7 @@ export class AuthService {
             const clubs = await this.usersService.getUserClubs(user.id);
             const newPayload = { sub: user.id, email: user.email, role: user.role, clubs };
             const refreshSecret = this.configService.getOrThrow<string>('REFRESH_SECRET');
-            const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '30d';
+            const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '7d';
 
             return {
                 access_token: this.jwtService.sign(newPayload),
@@ -211,7 +211,7 @@ export class AuthService {
         // El rol por club sigue disponible en el claim `clubs`.
         const payload = { sub: user.id, email: user.email, role: user.role, clubs };
         const refreshSecret = this.configService.getOrThrow<string>('REFRESH_SECRET');
-        const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '30d';
+        const refreshExpiresIn = this.configService.get<string>('REFRESH_EXPIRES_IN') ?? '7d';
 
         return {
             access_token: this.jwtService.sign(payload),
