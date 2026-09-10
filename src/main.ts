@@ -103,16 +103,32 @@ function validateEnv(config: ConfigService): void {
   }
 }
 
+// NestJS y pino usan nombres de nivel distintos: 'log' (Nest) = 'info' (pino).
+// Fastify usa pino internamente, asi que mapeamos antes de pasarle el level.
+const NEST_TO_PINO: Record<string, string> = {
+  log: 'info',
+  verbose: 'trace',
+  fatal: 'fatal',
+  error: 'error',
+  warn: 'warn',
+  debug: 'debug',
+};
+
+function resolveFastifyLogLevel(env: string | undefined, fallback: string): string {
+  const raw = (env ?? fallback).split(',').map(l => l.trim()).filter(Boolean)[0] ?? fallback;
+  return NEST_TO_PINO[raw] ?? raw;
+}
+
 async function bootstrap() {
-  const logLevel = (process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'log' : 'debug'))
-    .split(',')
-    .map(l => l.trim())
-    .filter(Boolean)[0] as 'log' | 'error' | 'warn' | 'debug' | 'verbose' | 'fatal' | undefined;
+  const fastifyLevel = resolveFastifyLogLevel(
+    process.env.LOG_LEVEL,
+    process.env.NODE_ENV === 'production' ? 'log' : 'debug',
+  );
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
-      logger: process.env.NODE_ENV !== 'production' ? { level: logLevel ?? 'debug' } : { level: logLevel ?? 'log' },
+      logger: { level: fastifyLevel },
       trustProxy: true,
     }),
   );
