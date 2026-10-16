@@ -35,11 +35,11 @@ export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Post()
-    @ApiOperation({ summary: 'Crear usuario', description: 'Crea un nuevo usuario (solo gestores de usuarios)' })
+    @ApiOperation({ summary: 'Crear usuario', description: 'Crea un nuevo usuario y lo afilia al club activo (solo gestores de usuarios)' })
     @ApiBearerAuth()
     @UseGuards(UserManagerGuard)
-    create(@Body() createUserDto: CreateUserDto, @Request() req: AuthRequest): Promise<User> {
-        return this.usersService.createUser(createUserDto, req.user);
+    create(@Body() createUserDto: CreateUserDto, @Request() req: AuthRequest, @CurrentClub() clubId?: string): Promise<User> {
+        return this.usersService.createUser(createUserDto, req.user, clubId);
     }
 
     @Get()

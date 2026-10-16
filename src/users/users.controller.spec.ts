@@ -42,7 +42,7 @@ describe('UsersController', () => {
             usersService.createUser.mockResolvedValue({ id: 'u1', ...dto } as never);
             const result = await controller.create(dto as never, mockReq as never);
             expect(result.id).toBe('u1');
-            expect(usersService.createUser).toHaveBeenCalledWith(dto, mockReq.user);
+            expect(usersService.createUser).toHaveBeenCalledWith(dto, mockReq.user, undefined);
         });
     });
 

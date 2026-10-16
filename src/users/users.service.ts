@@ -19,7 +19,7 @@ const ASSIGNABLE_ROLES: Record<string, UserRole[]> = {
 export class UsersService {
     constructor(private db: DatabaseService) { }
 
-    async createUser(data: CreateUserDto, actor?: AuthUser): Promise<User> {
+    async createUser(data: CreateUserDto, actor?: AuthUser, clubId?: string): Promise<User> {
         const { rows: existingUser } = await this.db.query(
             'SELECT id FROM users WHERE email = $1 LIMIT 1',
             [data.email]
@@ -55,6 +55,17 @@ export class UsersService {
                 hashedPassword
             ]
         );
+
+        // Afiliar al club activo (x-club-id): sin membresía el piloto creado no
+        // aparece en GET /users del club ni puede participar en sus rodadas.
+        if (clubId) {
+            await this.db.query(
+                `INSERT INTO club_members (club_id, user_id, role, invited_by, is_active)
+                 VALUES ($1, $2, $3, $4, TRUE)
+                 ON CONFLICT (club_id, user_id) DO UPDATE SET is_active = TRUE, role = $3`,
+                [clubId, rows[0].id, requestedRole, actor?.id ?? null]
+            );
+        }
 
         return rows[0];
     }
