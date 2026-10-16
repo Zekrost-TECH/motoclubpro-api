@@ -1,7 +1,11 @@
 import { Injectable, Inject, UnauthorizedException, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { Redis } from 'ioredis';
 import { DatabaseService } from '../database/database.service';
 import type { CreatePositionDto } from './dto/create-position.dto';
+import type { BatchPositionsDto, PositionPointDto } from './dto/batch-positions.dto';
+import { trackerSecret } from '../auth/strategies/tracker-jwt.strategy';
 import type { AuthUser } from '../auth/auth.types';
 
 interface RiderStatus {
@@ -17,11 +21,19 @@ interface RiderStatus {
     isCharging?: boolean;
 }
 
+// Usuario autenticado por token de tracking (scope 'tracker', atado a un evento).
+interface TrackingScopedUser extends AuthUser {
+    scope?: 'tracker';
+    trackingEventId?: string;
+}
+
 @Injectable()
 export class TrackerService {
     constructor(
         @Inject('REDIS_CLIENT') private readonly redis: Redis,
         private readonly db: DatabaseService,
+        private readonly jwtService: JwtService,
+        private readonly config: ConfigService,
     ) { }
 
     private trackKey(eventId: string, userId: string): string {
@@ -46,6 +58,30 @@ export class TrackerService {
         return Number.isNaN(ttl) ? 90 : ttl;
     }
 
+    // ── Token de tracking (scope limitado, larga duración) ─────────────────
+    // Emite un JWT que solo sirve para publicar posiciones en este evento.
+    // Lo usa el servicio nativo de Android, que no puede depender del access
+    // token de 15 minutos porque corre sin WebView durante toda la rodada.
+    async createTrackingToken(user: AuthUser, eventId: string): Promise<{ tracking_token: string; expires_in: number }> {
+        await this.assertPublishable(eventId, user);
+
+        const ttlSec = parseInt(this.config.get<string>('TRACKER_TOKEN_TTL_SEC') ?? '', 10);
+        const expiresIn = Number.isNaN(ttlSec) ? 12 * 3600 : ttlSec;
+
+        const token = this.jwtService.sign(
+            { sub: user.id, role: user.role, scope: 'tracker', eventId },
+            {
+                secret: trackerSecret(this.config),
+                expiresIn,
+                issuer: 'biker-os-api',
+                audience: 'biker-os-clients',
+                algorithm: 'HS256',
+            },
+        );
+
+        return { tracking_token: token, expires_in: expiresIn };
+    }
+
     /**
      * Guarda la posición de un rider en Redis para que el tracker la
      * broadcastee a los demás conectados. El TTL corto asegura que si un
@@ -56,11 +92,98 @@ export class TrackerService {
 
         // ROD-08: descartar coordenadas fuera de rango (GPS corrupto/manipulado)
         // antes de contaminar el radar.
+        this.assertValidPoint(lat, lng, speed);
+
+        const { attendeeRole } = await this.assertPublishable(eventId, user);
+
+        // 3. Construir payload igual que el tracker Go.
+        // role = rol operativo de la rodada; un manager que no es asistente
+        // cae al fallback de su rol del sistema.
+        const status: RiderStatus = {
+            lat,
+            lng,
+            speed: speed ?? 0,
+            heading: heading ?? 0,
+            timestamp: timestamp ?? Date.now(),
+            role: attendeeRole ?? user.role,
+            userId: user.id,
+            name: name ?? '',
+            battery,
+            isCharging: is_charging,
+        };
+
+        // 4. Guardar en Redis con TTL
+        await this.redis.set(
+            this.trackKey(eventId, user.id),
+            JSON.stringify(status),
+            'EX',
+            this.positionTTL(),
+        );
+
+        return { saved: true };
+    }
+
+    /**
+     * Batch de posiciones acumuladas offline por el servicio nativo. Valida
+     * el evento y la membresía UNA vez y escribe todas las keys en un solo
+     * pipeline Redis (un round-trip en vez de N).
+     */
+    async savePositions(user: AuthUser, dto: BatchPositionsDto): Promise<{ saved: number }> {
+        const { eventId, positions } = dto;
+        const { attendeeRole } = await this.assertPublishable(eventId, user);
+
+        const ttl = this.positionTTL();
+        const tx = this.redis.multi();
+        let count = 0;
+
+        for (const p of positions) {
+            try {
+                this.assertValidPoint(p.lat, p.lng, p.speed);
+            } catch {
+                continue; // punto corrupto en la cola: se descarta, no aborta el batch
+            }
+            const status: RiderStatus = this.buildStatus(p, user, attendeeRole);
+            tx.set(this.trackKey(eventId, user.id), JSON.stringify(status), 'EX', ttl);
+            count++;
+        }
+
+        if (count > 0) await tx.exec();
+        return { saved: count };
+    }
+
+    private buildStatus(p: PositionPointDto, user: AuthUser, attendeeRole?: string): RiderStatus {
+        return {
+            lat: p.lat,
+            lng: p.lng,
+            speed: p.speed ?? 0,
+            heading: p.heading ?? 0,
+            timestamp: p.timestamp ?? Date.now(),
+            role: attendeeRole ?? user.role,
+            userId: user.id,
+            name: p.name ?? '',
+            battery: p.battery,
+            isCharging: p.is_charging,
+        };
+    }
+
+    private assertValidPoint(lat: number, lng: number, speed?: number): void {
         if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
             throw new BadRequestException('Coordenadas fuera de rango');
         }
         if (speed !== undefined && (speed < 0 || speed > 500)) {
             throw new BadRequestException('Velocidad fuera de rango');
+        }
+    }
+
+    /**
+     * Validación compartida de publicación: evento existe y está en_curso,
+     * el token de tracking (si aplica) corresponde a este evento, y el usuario
+     * es asistente o admin/líder. Devuelve el ride_role operativo del asistente.
+     */
+    private async assertPublishable(eventId: string, user: TrackingScopedUser): Promise<{ attendeeRole?: string }> {
+        // Token con scope tracker: solo puede publicar en SU evento.
+        if (user.scope === 'tracker' && user.trackingEventId !== eventId) {
+            throw new ForbiddenException('Token de tracking no válido para este evento');
         }
 
         // 1. Verificar que el evento existe y está en curso (con cache Redis)
@@ -109,30 +232,6 @@ export class TrackerService {
             throw new UnauthorizedException('No estás autorizado para este evento');
         }
 
-        // 3. Construir payload igual que el tracker Go.
-        // role = rol operativo de la rodada; un manager que no es asistente
-        // cae al fallback de su rol del sistema.
-        const status: RiderStatus = {
-            lat,
-            lng,
-            speed: speed ?? 0,
-            heading: heading ?? 0,
-            timestamp: timestamp ?? Date.now(),
-            role: attendee?.ride_role ?? user.role,
-            userId: user.id,
-            name: name ?? '',
-            battery,
-            isCharging: is_charging,
-        };
-
-        // 4. Guardar en Redis con TTL
-        await this.redis.set(
-            this.trackKey(eventId, user.id),
-            JSON.stringify(status),
-            'EX',
-            this.positionTTL(),
-        );
-
-        return { saved: true };
+        return { attendeeRole: attendee?.ride_role || undefined };
     }
 }
